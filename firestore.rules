@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function me() { return get(/databases/$(db)/documents/usuarios/$(request.auth.uid)).data; }
+    function isRole(r) { return signedIn() && me().rol == r; }
+    function inv() { return /databases/$(db)/documents/invitaciones/$(request.auth.token.email); }
+    // fecha = "AAAA-MM-DD"; true si cae dentro de los últimos 28 días
+    function editable(fecha) {
+      let p = fecha.split('-');
+      return timestamp.date(int(p[0]), int(p[1]), int(p[2]))
+             >= request.time - duration.value(28, 'd');
+    }
+
+    match /invitaciones/{email} {
+      allow read: if signedIn() && request.auth.token.email == email;
+      allow write: if isRole('admin');
+    }
+
+    match /usuarios/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isRole('admin'));
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.auth.token.email_verified
+        && exists(inv())
+        && request.resource.data.rol == get(inv()).data.rol;
+      allow update, delete: if isRole('admin');
+    }
+
+    match /grupos/{gid} {
+      allow read: if isRole('admin') || isRole('orden')
+        || (isRole('profesor') && request.auth.uid in resource.data.profesores);
+      allow write: if isRole('admin');
+    }
+
+    match /clases/{cid} {
+      allow read: if isRole('admin') || isRole('orden')
+        || (isRole('profesor') && resource.data.profesorUid == request.auth.uid);
+      allow write: if isRole('admin');
+    }
+
+    match /pases/{pid} {
+      allow read: if isRole('admin') || isRole('orden')
+        || (isRole('profesor') && resource.data.profesorUid == request.auth.uid);
+      // Primer envío del pase
+      allow create: if isRole('profesor')
+        && request.resource.data.profesorUid == request.auth.uid
+        && get(/databases/$(db)/documents/clases/$(request.resource.data.claseId)).data.profesorUid == request.auth.uid;
+      // Edición: solo estados y marcas de tiempo, solo los últimos 28 días
+      allow update: if isRole('profesor')
+        && resource.data.profesorUid == request.auth.uid
+        && editable(resource.data.fecha)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['estados', 'marcadoEn', 'enviadoEn', 'editadoEn']);
+      allow delete: if isRole('admin');
+    }
+  }
+}

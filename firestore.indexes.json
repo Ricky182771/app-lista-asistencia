@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "pases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profesorUid", "order": "ASCENDING" },
+        { "fieldPath": "claseId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,0 +1,50 @@
+# ── Datos reales: NUNCA al repo ──────────────────────────────
+# Solo se permiten los CSV de prueba inventados en test/fixtures/
+*.csv
+!test/fixtures/**/*.csv
+*.xlsx
+*.xls
+*.ods
+
+# Credenciales de Firebase Admin (la app nunca las usa)
+*-firebase-adminsdk-*.json
+service-account*.json
+.env
+.env.*
+
+# ── Flutter / Dart ──────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+*.g.dart.tmp
+
+# ── Android ─────────────────────────────────────────────────
+android/.gradle/
+android/captures/
+android/local.properties
+android/key.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+*.jks
+*.keystore
+
+# ── Firebase CLI ────────────────────────────────────────────
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+emulator-data/
+
+# ── IDEs y sistema ──────────────────────────────────────────
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+*.swp
+*.log
