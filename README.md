@@ -1,7 +1,7 @@
-# app-lista-asistencia
+# PaseLista
 
 App de lista de asistencia por clase para la escuela. Proyecto de servicio social.
-*(El nombre definitivo de la app todavía no está decidido).*
+*(El repo conserva el nombre `app-lista-asistencia`; el paquete de Dart es `app_lista_asistencia`).*
 
 - **Profesores:** pasan lista en cada clase desde Android o desde el navegador (iPhone y computadoras). Funciona sin internet y sincroniza después.
 - **Encargados de orden:** ven los ausentes de cada grupo y copian un mensaje listo para el grupo de padres.
