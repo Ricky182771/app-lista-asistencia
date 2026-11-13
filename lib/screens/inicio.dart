@@ -55,12 +55,12 @@ class Avatar extends StatelessWidget {
   }
 }
 
-class ProfesorHome extends StatelessWidget {
-  const ProfesorHome({super.key, required this.usuario});
-  final Map<String, dynamic> usuario;
-
-  @override
-  Widget build(BuildContext context) => Inicio(usuario: usuario);
+/// Para escrituras sin `await` (sin internet el Future no se completa; ver CLAUDE.md): solo avisa si falla.
+void avisarSiFalla(BuildContext context, Future<void> escritura, String mensaje) {
+  final avisos = ScaffoldMessenger.of(context);
+  escritura.catchError((Object e) {
+    avisos.showSnackBar(SnackBar(content: Text('$mensaje: $e')));
+  });
 }
 
 class OrdenHome extends StatelessWidget {

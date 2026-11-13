@@ -3,12 +3,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'firebase_options.dart';
 import 'models/rol.dart';
 import 'screens/admin_home.dart';
 import 'screens/inicio.dart';
 import 'screens/login_screen.dart';
+import 'screens/profesor_home.dart';
 import 'screens/sin_acceso_screen.dart';
 import 'services/sesion.dart';
 
@@ -31,6 +33,10 @@ class PaseListaApp extends StatelessWidget {
     return MaterialApp(
       title: 'PaseLista',
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo)),
+      // Calendario y textos de Material en español de México.
+      locale: const Locale('es', 'MX'),
+      supportedLocales: const [Locale('es', 'MX')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: const Raiz(),
     );
   }

@@ -41,6 +41,8 @@ dependencies:
   csv: ^8.0.0
   intl: ^0.20.3
   file_picker: ^13.3.3
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:

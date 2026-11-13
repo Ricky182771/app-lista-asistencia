@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../models/rol.dart';
 import '../services/sesion.dart';
+import 'datos_prueba.dart';
 import 'inicio.dart';
 
 class AdminHome extends StatefulWidget {
@@ -56,6 +57,7 @@ class _AdminHomeState extends State<AdminHome> {
     return Inicio(
       usuario: widget.usuario,
       children: [
+        const BotonDatosPrueba(), // solo en depuración
         const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,
