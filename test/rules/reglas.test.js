@@ -17,6 +17,7 @@ import {
   serverTimestamp,
   setDoc,
   setLogLevel,
+  Timestamp,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -239,6 +240,24 @@ describe('pases', () => {
     await assertFails(updateDoc(ref, { profesorUid: 'profe2' }));
     await assertFails(updateDoc(ref, { grupoId: 'g2' }));
     await assertFails(updateDoc(ref, { claseId: 'profe2_g2' }));
+  });
+
+  test('marcadoEn queda fijo: no se edita', async () => {
+    const ref = doc(como('profe'), `pases/profe_g1_${HACE_5}`);
+    await assertFails(updateDoc(ref, { marcadoEn: Timestamp.now() }));
+  });
+
+  test('un pase del mismo día enviado desde otro dispositivo no reemplaza al original', async () => {
+    const f = fecha(0);
+    const ref = doc(como('profe'), `pases/profe_g1_${f}`);
+    const original = { ...pase('profe_g1', 'g1', 'profe', f), marcadoEn: Timestamp.fromMillis(1000) };
+    await assertSucceeds(setDoc(ref, original));
+    // Otro dispositivo: otra hora en marcadoEn y otros estados
+    await assertFails(setDoc(ref, { ...original, marcadoEn: Timestamp.fromMillis(2000), estados: { 1: 1, 2: 1, 3: 1 } }));
+    // Reintento del mismo envío (se perdió la confirmación): misma hora, sí pasa
+    await assertSucceeds(setDoc(ref, { ...original, enviadoEn: serverTimestamp() }));
+    // Guardar cambios no toca marcadoEn
+    await assertSucceeds(updateDoc(ref, { 'estados.2': 2, editadoEn: serverTimestamp() }));
   });
 
   test('no edita pases de otro profe', async () => {
