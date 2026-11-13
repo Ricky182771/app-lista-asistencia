@@ -68,8 +68,10 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
 - Los IDs de `clases` y `pases` son **determinísticos** para que un reintento sin internet no duplique
   documentos.
 - Editar un pase es un `update()` que solo toca `estados` y `editadoEn`
-  (`{'estados.3': 2, 'editadoEn': FieldValue.serverTimestamp()}`). Las reglas solo dejan cambiar `estados`
-  y las marcas de tiempo; el salón se fija al crear el pase.
+  (`{'estados.3': 2, 'editadoEn': FieldValue.serverTimestamp()}`). Las reglas solo dejan cambiar `estados`,
+  `enviadoEn` y `editadoEn`; el salón y `marcadoEn` se fijan al crear el pase. Así, un pase del mismo día
+  enviado sin internet desde otro dispositivo (otra hora en `marcadoEn`) se rechaza al sincronizar y el
+  original queda intacto.
 - El profe puede **crear o editar** pases de hoy y de los **últimos 28 días**, nunca de fechas futuras.
 - Las consultas deben filtrar igual que las reglas (por ejemplo `where('profesorUid', isEqualTo: uid)`);
   si no, Firestore rechaza la consulta completa.

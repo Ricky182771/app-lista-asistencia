@@ -64,12 +64,14 @@ service cloud.firestore {
         && clase(request.resource.data.claseId).profesorUid == request.auth.uid
         && request.resource.data.grupoId == clase(request.resource.data.claseId).grupoId
         && pid == request.resource.data.claseId + '_' + request.resource.data.fecha;
-      // Edición: solo estados y marcas de tiempo, solo los últimos 28 días
+      // Edición: solo estados y marcas de tiempo, solo los últimos 28 días. marcadoEn queda fijo: un pase
+      // del mismo día enviado desde otro dispositivo trae otra hora y se rechaza en vez de reemplazar al
+      // original; el reintento de un mismo envío trae la misma hora y sí pasa.
       allow update: if isRole('profesor')
         && resource.data.profesorUid == request.auth.uid
         && editable(resource.data.fecha)
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['estados', 'marcadoEn', 'enviadoEn', 'editadoEn']);
+             .hasOnly(['estados', 'enviadoEn', 'editadoEn']);
       allow delete: if isRole('admin');
     }
   }
