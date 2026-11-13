@@ -61,6 +61,36 @@ Si tu rama se queda atrás de `main`: `git fetch origin && git rebase origin/mai
 | Compañero 2 | Importador de CSV con vista previa, alta de clases, manual de usuario | H2 |
 | Los tres | Piloto con profes (30 nov – 4 dic) y correcciones | H5 |
 
+## Iniciar sesión en Android: registra tu SHA-1 (cada integrante)
+
+El login con Google en Android solo funciona si la huella **SHA-1** de la llave con la que se
+compila la app está registrada en Firebase. Cada computadora tiene su propia llave de depuración,
+así que **cada integrante** debe registrar la suya una vez. Si falta, la app muestra
+"Google rechazó esta instalación de la app (ApiException: 10)".
+
+1. Saca tu SHA-1 (Linux/macOS; en Windows usa `%USERPROFILE%\.android\debug.keystore`):
+   ```bash
+   keytool -list -v -alias androiddebugkey -keystore ~/.android/debug.keystore \
+     -storepass android -keypass android | grep SHA1
+   ```
+   (También sale con `cd android && ./gradlew signingReport`).
+2. Mándasela a Ricardo. Él la agrega en Firebase → ⚙️ Configuración del proyecto → Tus apps →
+   app de Android → **Agregar huella digital**.
+3. Espera unos minutos y vuelve a intentar. No hace falta cambiar código ni `google-services.json`.
+
+En web (`flutter run -d chrome`) no se necesita SHA-1.
+
+## Crear el primer administrativo (una sola vez, solo Ricardo)
+
+Nadie puede entrar sin invitación, y solo un admin puede invitar. El primero se crea a mano:
+
+1. Firebase → **Firestore Database** → colección `invitaciones` → **Agregar documento**.
+2. ID del documento: el correo de Google del admin **en minúsculas** (ej. `ana.perez@gmail.com`).
+3. Un campo: `rol` (string) = `admin`.
+4. Entra a la app con esa cuenta: se crea `usuarios/{uid}` con su nombre, foto y rol.
+
+Desde ahí, ese admin invita a los demás con **Invitar usuario** (roles: `profesor`, `orden`, `admin`).
+
 ## Estructura
 
 ```

@@ -4,7 +4,8 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function me() { return get(/databases/$(db)/documents/usuarios/$(request.auth.uid)).data; }
     function isRole(r) { return signedIn() && me().rol == r; }
-    function inv() { return /databases/$(db)/documents/invitaciones/$(request.auth.token.email); }
+    function correo() { return request.auth.token.email.lower(); }
+    function inv() { return /databases/$(db)/documents/invitaciones/$(correo()); }
     // fecha = "AAAA-MM-DD"
     function fechaTs(fecha) {
       let p = fecha.split('-');
@@ -17,7 +18,7 @@ service cloud.firestore {
     }
 
     match /invitaciones/{email} {
-      allow read: if signedIn() && request.auth.token.email == email;
+      allow read: if signedIn() && (correo() == email || isRole('admin'));
       allow write: if isRole('admin');
     }
 
