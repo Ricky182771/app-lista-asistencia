@@ -62,3 +62,11 @@ Future<void> enviarPase({
 /// Un solo `update()` con lo que cambió; no toca `marcadoEn`. Sin `await` (ver [enviarPase]).
 Future<void> guardarCambios(String paseId, Map<String, int> campos) =>
     _db.doc('pases/$paseId').update({...campos, 'editadoEn': FieldValue.serverTimestamp()});
+
+/// Aviso cuando falla [enviarPase]. permission-denied sale si ya existía el pase de ese día (otra hora
+/// en `marcadoEn`) pero también si le quitaron el acceso, así que no se afirma ninguna de las dos.
+String mensajeErrorEnvio(Object e, String fecha) =>
+    e is FirebaseException && e.code == 'permission-denied'
+        ? 'El servidor no aceptó el pase del $fecha. Si ya habías pasado lista ese día desde otro '
+            'dispositivo, se conservó ese.'
+        : 'No se envió el pase del $fecha: $e';
