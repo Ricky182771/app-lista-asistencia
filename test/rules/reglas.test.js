@@ -143,6 +143,10 @@ describe('alta de usuario', () => {
     await assertSucceeds(setDoc(doc(db, 'usuarios/nuevo'), alta({ nombre: 'a'.repeat(100) })));
   });
 
+  test('acepta un nombre de 100 caracteres con acentos (size() cuenta caracteres, no bytes)', async () => {
+    await assertSucceeds(setDoc(doc(como('nuevo'), 'usuarios/nuevo'), alta({ nombre: 'é'.repeat(100) })));
+  });
+
   test('se rechaza con fotoUrl que no es string ni null', async () => {
     await assertFails(setDoc(doc(como('nuevo'), 'usuarios/nuevo'), alta({ fotoUrl: 5 })));
   });
@@ -200,6 +204,23 @@ describe('pases', () => {
     await assertSucceeds(crear(fecha(-27)));
   });
 
+  test('se rechaza un pase con el grupoId de otro grupo', async () => {
+    const f = fecha(0);
+    await assertFails(setDoc(doc(como('profe'), `pases/profe_g1_${f}`), pase('profe_g1', 'g2', 'profe', f)));
+  });
+
+  test('se rechaza un pase cuyo ID no es {claseId}_{fecha}', async () => {
+    const db = como('profe');
+    const f = fecha(0);
+    await assertFails(setDoc(doc(db, `pases/profe_g1_${fecha(-1)}`), pase('profe_g1', 'g1', 'profe', f)));
+    await assertFails(setDoc(doc(db, 'pases/x7Kq2'), pase('profe_g1', 'g1', 'profe', f)));
+  });
+
+  test('se rechaza un pase sobre la clase de otro profe aunque ponga su propio profesorUid', async () => {
+    const f = fecha(0);
+    await assertFails(setDoc(doc(como('profe'), `pases/profe2_g2_${f}`), pase('profe2_g2', 'g2', 'profe', f)));
+  });
+
   test('se rechazan uno de hace 30 días y uno de mañana', async () => {
     await assertFails(crear(fecha(-30)));
     await assertFails(crear(fecha(1)));
@@ -211,6 +232,8 @@ describe('pases', () => {
     await assertFails(updateDoc(ref, { salon: 'B2' }));
     await assertFails(updateDoc(ref, { fecha: fecha(-1) }));
     await assertFails(updateDoc(ref, { profesorUid: 'profe2' }));
+    await assertFails(updateDoc(ref, { grupoId: 'g2' }));
+    await assertFails(updateDoc(ref, { claseId: 'profe2_g2' }));
   });
 
   test('no edita pases de otro profe', async () => {

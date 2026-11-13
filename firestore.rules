@@ -6,6 +6,7 @@ service cloud.firestore {
     function isRole(r) { return signedIn() && me().rol == r; }
     function correo() { return request.auth.token.email.lower(); }
     function inv() { return /databases/$(db)/documents/invitaciones/$(correo()); }
+    function clase(id) { return get(/databases/$(db)/documents/clases/$(id)).data; }
     // fecha = "AAAA-MM-DD"
     function fechaTs(fecha) {
       let p = fecha.split('-');
@@ -53,11 +54,14 @@ service cloud.firestore {
     match /pases/{pid} {
       allow read: if isRole('admin') || isRole('orden')
         || (isRole('profesor') && resource.data.profesorUid == request.auth.uid);
-      // Pase nuevo: hoy o un día olvidado de los últimos 28
+      // Pase nuevo: hoy o un día olvidado de los últimos 28, de una clase propia,
+      // con el grupo de esa clase y con ID {claseId}_{fecha} (un pase por clase por día)
       allow create: if isRole('profesor')
         && request.resource.data.profesorUid == request.auth.uid
         && editable(request.resource.data.fecha)
-        && get(/databases/$(db)/documents/clases/$(request.resource.data.claseId)).data.profesorUid == request.auth.uid;
+        && clase(request.resource.data.claseId).profesorUid == request.auth.uid
+        && request.resource.data.grupoId == clase(request.resource.data.claseId).grupoId
+        && pid == request.resource.data.claseId + '_' + request.resource.data.fecha;
       // Edición: solo estados y marcas de tiempo, solo los últimos 28 días
       allow update: if isRole('profesor')
         && resource.data.profesorUid == request.auth.uid
