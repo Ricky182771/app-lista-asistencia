@@ -1,6 +1,6 @@
 {
-    "name": "app_lista_asistencia",
-    "short_name": "app_lista_asistencia",
+    "name": "PaseLista",
+    "short_name": "PaseLista",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
