@@ -18,10 +18,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _entrando = true;
       _error = null;
     });
+    final reloj = Stopwatch()..start();
     try {
       await entrarConGoogle(); // authStateChanges() cambia la pantalla
     } catch (e) {
-      if (mounted) setState(() => _error = mensajeDeError(e));
+      if (mounted) setState(() => _error = mensajeDeError(e, reloj.elapsed));
     } finally {
       if (mounted) setState(() => _entrando = false);
     }
