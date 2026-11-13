@@ -23,6 +23,8 @@ flutter test                       # debe pasar antes de cada commit
 flutter run -d chrome              # web (Chromium vía CHROME_EXECUTABLE)
 flutter run                        # Android con el celular conectado
 firebase emulators:start           # Auth 9099, Firestore 8080, Hosting 5000
+npm --prefix test/rules install    # una vez: dependencias de las pruebas de reglas
+firebase emulators:exec --only firestore "npm --prefix test/rules test"   # pruebas de firestore.rules
 firebase deploy --only firestore:rules,firestore:indexes
 flutter build apk --release
 flutter build web && firebase deploy --only hosting
@@ -93,6 +95,7 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
 - Código en `lib/models/`, `lib/services/` y `lib/screens/`. Sin paquetes de estado o navegación
   extra salvo que se justifiquen en el PR.
 - Pruebas unitarias para la lógica pura (parseo de CSV, estados, fechas, armado del mensaje).
+- Cualquier cambio a `firestore.rules` viene con sus pruebas en `test/rules/reglas.test.js`.
 - Una rama por tarea (`feat/…`, `fix/…`, `chore/…`, `docs/…`). `main` está protegida: todo entra por PR
   con aprobación de Ricardo, con squash. Llena la plantilla `.github/pull_request_template.md`.
 
@@ -116,5 +119,8 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   Firebase. Cada integrante registra la suya:
   `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android`.
 - Si `flutter create` se vuelve a correr, revisa que `.metadata` siga listando `android` **y** `web`.
+- **`firebase` instalado como binario standalone** (`curl -sL firebase.tools | bash`): dentro de
+  `emulators:exec` usa su propio `npm`, que falla con `/bin/sh: --: opción inválida`. Instala la CLI con
+  npm (`npm i -g firebase-tools`) o corre las pruebas con `npx firebase-tools emulators:exec …`.
 - Las advertencias de AGP 9 sobre `org.jetbrains.kotlin.android` vienen de los plugins de Firebase; se
   pueden ignorar hasta que los actualicen.

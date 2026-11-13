@@ -70,8 +70,10 @@ Future<Map<String, dynamic>?> cargarUsuario(User user) async {
   final inv = await _db.doc('invitaciones/$correo').get();
   if (!inv.exists) return null;
 
+  // Las reglas piden nombre de 1 a 100 caracteres.
+  final nombre = user.displayName?.trim() ?? '';
   final usuario = <String, dynamic>{
-    'nombre': user.displayName ?? correo,
+    'nombre': String.fromCharCodes((nombre.isEmpty ? correo : nombre).runes.take(100)),
     'email': correo,
     'fotoUrl': user.photoURL,
     'rol': inv.data()!['rol'],
