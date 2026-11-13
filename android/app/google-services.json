@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "890002617133",
+    "project_id": "paselista-9326a",
+    "storage_bucket": "paselista-9326a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:890002617133:android:8b36b7f8f2c9bd550519a4",
+        "android_client_info": {
+          "package_name": "io.github.ricky182771.app_lista_asistencia"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "890002617133-a14nf1phnm7niut63abva5k679749jfr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9k74KVArDXpHCs_CLr2NAkxE8H7EQwmM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "890002617133-a14nf1phnm7niut63abva5k679749jfr.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

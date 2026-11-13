@@ -5,13 +5,49 @@
   },
   "hosting": {
     "public": "build/web",
-    "ignore": ["firebase.json", "**/.*"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+    "ignore": [
+      "firebase.json",
+      "**/.*"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
   },
   "emulators": {
-    "auth": { "port": 9099 },
-    "firestore": { "port": 8080 },
-    "hosting": { "port": 5000 },
-    "ui": { "enabled": true }
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "hosting": {
+      "port": 5000
+    },
+    "ui": {
+      "enabled": true
+    }
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "paselista-9326a",
+          "appId": "1:890002617133:android:8b36b7f8f2c9bd550519a4",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "paselista-9326a",
+          "configurations": {
+            "android": "1:890002617133:android:8b36b7f8f2c9bd550519a4",
+            "web": "1:890002617133:web:6a7e5bfe14d2ad560519a4"
+          }
+        }
+      }
+    }
   }
 }
