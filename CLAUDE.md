@@ -122,6 +122,10 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
 - **`ApiException: 10` en Android** = falta la SHA-1 de la llave de depuración de esa computadora en
   Firebase. Cada integrante registra la suya:
   `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android`.
+- **Las reglas se despliegan solo desde `main` actualizado** (`git switch main && git pull` antes de
+  `firebase deploy --only firestore:rules`). `deploy` sube el `firestore.rules` de la carpeta actual: desde
+  una rama creada antes de un cambio de reglas se despliegan las reglas viejas y se deshace ese cambio en
+  producción sin aviso. Si una rama de app queda atrás de un PR de reglas, actualízala con `git merge origin/main`.
 - Si `flutter create` se vuelve a correr, revisa que `.metadata` siga listando `android` **y** `web`.
 - **`firebase` instalado como binario standalone** (`curl -sL firebase.tools | bash`): dentro de
   `emulators:exec` usa su propio `npm`, que falla con `/bin/sh: --: opción inválida`. Instala la CLI con
