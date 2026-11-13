@@ -62,11 +62,3 @@ void avisarSiFalla(BuildContext context, Future<void> escritura, String mensaje)
     avisos.showSnackBar(SnackBar(content: Text('$mensaje: $e')));
   });
 }
-
-class OrdenHome extends StatelessWidget {
-  const OrdenHome({super.key, required this.usuario});
-  final Map<String, dynamic> usuario;
-
-  @override
-  Widget build(BuildContext context) => Inicio(usuario: usuario);
-}

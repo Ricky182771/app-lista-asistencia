@@ -36,6 +36,18 @@ Stream<QuerySnapshot<Map<String, dynamic>>> pasesDelMes(
         .where('fecha', isLessThan: rango.hasta)
         .snapshots(includeMetadataChanges: true);
 
+// Orden (y admin) leen grupos, clases y pases sin depender del documento, así que pueden consultar
+// colecciones completas.
+
+Stream<QuerySnapshot<Map<String, dynamic>>> todosLosGrupos() =>
+    _db.collection('grupos').snapshots(includeMetadataChanges: true);
+
+Stream<QuerySnapshot<Map<String, dynamic>>> todasLasClases() =>
+    _db.collection('clases').snapshots(includeMetadataChanges: true);
+
+Stream<QuerySnapshot<Map<String, dynamic>>> pasesDeLaFecha(String fecha) =>
+    _db.collection('pases').where('fecha', isEqualTo: fecha).snapshots(includeMetadataChanges: true);
+
 /// Sin `await` a propósito: sin internet el Future no se completa (ver CLAUDE.md).
 /// [clase] es `clases/{claseId}`; el salón se fija aquí y las reglas ya no dejan cambiarlo.
 Future<void> enviarPase({
