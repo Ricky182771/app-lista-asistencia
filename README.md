@@ -56,9 +56,9 @@ Si tu rama se queda atrás de `main`: `git fetch origin && git rebase origin/mai
 
 | Quién | Módulo | Hito |
 | --- | --- | --- |
-| Ricardo | Base, Firebase, login y roles, reglas, pase de lista del profesor (vista por día y mensual, modo sin internet) | H0, H1, H3 |
-| Compañero 1 | Pantallas del encargado de orden y generador del mensaje para padres | H4 |
-| Compañero 2 | Importador de CSV con vista previa, alta de clases, manual de usuario | H2 |
+| Ricardo | Base, Firebase, login, roles y reglas (terminados); pase de lista del profesor (vista por día y mensual, modo sin internet); vista del encargado de orden y mensaje para padres; revisión de PR | H0, H1, H3, H4 |
+| Compañero de programación | Importador de CSV con vista previa, edición de alumnos y alta de clases | H2 |
+| Compañero de documentación | Documento para la materia de proyectos, manual de usuario y coordinación del piloto (no programa) | — |
 | Los tres | Piloto con profes (30 nov – 4 dic) y correcciones | H5 |
 
 ## Iniciar sesión en Android: registra tu SHA-1 (cada integrante)
