@@ -84,4 +84,15 @@ void main() {
     expect(camposEditados(guardados, {'1': 0}), isEmpty);
     expect(camposEditados(guardados, {}), isEmpty);
   });
+
+  test('rangoDelMes: del día 1 al primer día del mes siguiente, también en diciembre', () {
+    expect(rangoDelMes(2026, 11), (desde: '2026-11-01', hasta: '2026-12-01'));
+    expect(rangoDelMes(2026, 12), (desde: '2026-12-01', hasta: '2027-01-01'));
+  });
+
+  test('columnasDelMes: días con pase, sin repetir y ordenados', () {
+    expect(columnasDelMes(['2026-11-13', '2026-11-02', '2026-11-10', '2026-11-02']),
+        ['2026-11-02', '2026-11-10', '2026-11-13']);
+    expect(columnasDelMes(const []), isEmpty);
+  });
 }

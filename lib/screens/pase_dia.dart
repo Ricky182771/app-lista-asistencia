@@ -8,6 +8,7 @@ import '../models/pase.dart';
 import '../services/pases.dart';
 import 'celda_estado.dart';
 import 'inicio.dart';
+import 'pase_mensual.dart';
 
 /// Pase de lista de una clase en un día: crear (Enviar) o editar (Guardar cambios).
 class PaseDia extends StatefulWidget {
@@ -61,18 +62,72 @@ class _PaseDiaState extends State<PaseDia> {
       firstDate: DateTime(hoy.year, hoy.month, hoy.day - diasEditables),
       lastDate: hoy,
     );
-    if (elegida == null || fechaLocal(elegida) == _fecha) return;
+    if (elegida == null || fechaLocal(elegida) == _fecha || !await _descartarCambios()) return;
     setState(() {
       _fecha = fechaLocal(elegida);
       _escuchar();
     });
   }
 
+  /// `true` si no hay cambios sin guardar o el profe decide descartarlos.
+  Future<bool> _descartarCambios() async {
+    if (_cambios.isEmpty) return true;
+    final descartar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cambios sin guardar'),
+        content: Text('Tienes cambios sin guardar en el pase del $_fecha.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Descartar cambios')),
+          FilledButton(onPressed: () => Navigator.pop(context, false), child: const Text('Seguir editando')),
+        ],
+      ),
+    );
+    if (descartar != true || !mounted) return false;
+    setState(_cambios.clear);
+    return true;
+  }
+
+  Future<void> _abrirMensual() async {
+    if (!await _descartarCambios() || !mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => PaseMensual(
+          clase: widget.clase,
+          grupo: widget.grupo,
+          titulo: widget.titulo,
+          mes: DateTime.parse(_fecha),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final snap = _snap;
+    return PopScope(
+      canPop: _cambios.isEmpty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || !await _descartarCambios() || !context.mounted) return;
+        Navigator.pop(context);
+      },
+      child: _pantalla(snap),
+    );
+  }
+
+  Widget _pantalla(QuerySnapshot<Map<String, dynamic>>? snap) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.titulo)),
+      appBar: AppBar(
+        title: Text(widget.titulo),
+        actions: [
+          IconButton(
+            tooltip: 'Vista mensual',
+            icon: const Icon(Icons.calendar_view_month),
+            onPressed: _abrirMensual,
+          ),
+        ],
+      ),
       body: _error != null
           ? Center(child: Text('Error al cargar el pase: $_error'))
           : snap == null
@@ -208,17 +263,18 @@ class _PaseDiaState extends State<PaseDia> {
   }
 
   void _enviar(Map<String, dynamic> iniciales) {
-    avisarSiFalla(
-      context,
-      enviarPase(
-        claseId: widget.clase.id,
-        clase: widget.clase.data()!,
-        fecha: _fecha,
-        salon: _salon.text.trim(),
-        estados: {...iniciales.cast<String, int>(), ..._cambios},
-      ),
-      'No se envió el pase del $_fecha',
-    );
+    final avisos = ScaffoldMessenger.of(context);
+    final fecha = _fecha;
+    // Sin `await`: sin internet el Future no se completa (ver CLAUDE.md); solo avisa si falla.
+    enviarPase(
+      claseId: widget.clase.id,
+      clase: widget.clase.data()!,
+      fecha: fecha,
+      salon: _salon.text.trim(),
+      estados: {...iniciales.cast<String, int>(), ..._cambios},
+    ).catchError((Object e) {
+      avisos.showSnackBar(SnackBar(content: Text(mensajeErrorEnvio(e, fecha))));
+    });
     setState(_cambios.clear);
   }
 

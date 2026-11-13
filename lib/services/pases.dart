@@ -22,6 +22,20 @@ Stream<QuerySnapshot<Map<String, dynamic>>> paseDelDia(String uid, String claseI
         .where('fecha', isEqualTo: fecha)
         .snapshots(includeMetadataChanges: true);
 
+/// Pases de una clase en el mes: `fecha` en [desde, hasta). Usa el índice de firestore.indexes.json.
+Stream<QuerySnapshot<Map<String, dynamic>>> pasesDelMes(
+  String uid,
+  String claseId,
+  ({String desde, String hasta}) rango,
+) =>
+    _db
+        .collection('pases')
+        .where('profesorUid', isEqualTo: uid)
+        .where('claseId', isEqualTo: claseId)
+        .where('fecha', isGreaterThanOrEqualTo: rango.desde)
+        .where('fecha', isLessThan: rango.hasta)
+        .snapshots(includeMetadataChanges: true);
+
 /// Sin `await` a propósito: sin internet el Future no se completa (ver CLAUDE.md).
 /// [clase] es `clases/{claseId}`; el salón se fija aquí y las reglas ya no dejan cambiarlo.
 Future<void> enviarPase({
@@ -48,3 +62,11 @@ Future<void> enviarPase({
 /// Un solo `update()` con lo que cambió; no toca `marcadoEn`. Sin `await` (ver [enviarPase]).
 Future<void> guardarCambios(String paseId, Map<String, int> campos) =>
     _db.doc('pases/$paseId').update({...campos, 'editadoEn': FieldValue.serverTimestamp()});
+
+/// Aviso cuando falla [enviarPase]. permission-denied sale si ya existía el pase de ese día (otra hora
+/// en `marcadoEn`) pero también si le quitaron el acceso, así que no se afirma ninguna de las dos.
+String mensajeErrorEnvio(Object e, String fecha) =>
+    e is FirebaseException && e.code == 'permission-denied'
+        ? 'El servidor no aceptó el pase del $fecha. Si ya habías pasado lista ese día desde otro '
+            'dispositivo, se conservó ese.'
+        : 'No se envió el pase del $fecha: $e';

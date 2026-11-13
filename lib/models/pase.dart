@@ -73,3 +73,10 @@ Map<String, int> camposEditados(Map<String, dynamic> estados, Map<String, int> c
       for (final e in cambios.entries)
         if (estados[e.key] != e.value) 'estados.${e.key}': e.value,
     };
+
+/// Rango para la consulta del mes: `fecha >= desde` y `fecha < hasta` (primer día del mes siguiente).
+({String desde, String hasta}) rangoDelMes(int anio, int mes) =>
+    (desde: fechaLocal(DateTime(anio, mes)), hasta: fechaLocal(DateTime(anio, mes + 1)));
+
+/// Columnas de la vista mensual: un día por cada pase, sin repetir y en orden ("AAAA-MM-DD" ordena como texto).
+List<String> columnasDelMes(Iterable<String> fechas) => {...fechas}.toList()..sort();
