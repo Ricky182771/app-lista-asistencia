@@ -22,6 +22,20 @@ Stream<QuerySnapshot<Map<String, dynamic>>> paseDelDia(String uid, String claseI
         .where('fecha', isEqualTo: fecha)
         .snapshots(includeMetadataChanges: true);
 
+/// Pases de una clase en el mes: `fecha` en [desde, hasta). Usa el índice de firestore.indexes.json.
+Stream<QuerySnapshot<Map<String, dynamic>>> pasesDelMes(
+  String uid,
+  String claseId,
+  ({String desde, String hasta}) rango,
+) =>
+    _db
+        .collection('pases')
+        .where('profesorUid', isEqualTo: uid)
+        .where('claseId', isEqualTo: claseId)
+        .where('fecha', isGreaterThanOrEqualTo: rango.desde)
+        .where('fecha', isLessThan: rango.hasta)
+        .snapshots(includeMetadataChanges: true);
+
 /// Sin `await` a propósito: sin internet el Future no se completa (ver CLAUDE.md).
 /// [clase] es `clases/{claseId}`; el salón se fija aquí y las reglas ya no dejan cambiarlo.
 Future<void> enviarPase({

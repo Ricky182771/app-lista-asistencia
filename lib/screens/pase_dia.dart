@@ -8,6 +8,7 @@ import '../models/pase.dart';
 import '../services/pases.dart';
 import 'celda_estado.dart';
 import 'inicio.dart';
+import 'pase_mensual.dart';
 
 /// Pase de lista de una clase en un día: crear (Enviar) o editar (Guardar cambios).
 class PaseDia extends StatefulWidget {
@@ -72,7 +73,26 @@ class _PaseDiaState extends State<PaseDia> {
   Widget build(BuildContext context) {
     final snap = _snap;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.titulo)),
+      appBar: AppBar(
+        title: Text(widget.titulo),
+        actions: [
+          IconButton(
+            tooltip: 'Vista mensual',
+            icon: const Icon(Icons.calendar_view_month),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => PaseMensual(
+                  clase: widget.clase,
+                  grupo: widget.grupo,
+                  titulo: widget.titulo,
+                  mes: DateTime.parse(_fecha),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: _error != null
           ? Center(child: Text('Error al cargar el pase: $_error'))
           : snap == null
