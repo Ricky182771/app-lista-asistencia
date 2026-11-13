@@ -204,6 +204,11 @@ describe('pases', () => {
     await assertSucceeds(crear(fecha(-27)));
   });
 
+  // Antes se comparaba contra la hora exacta y −28 se rechazaba siempre; ahora se compara por día.
+  test('el profe crea un pase de hace 28 días sin importar la hora', async () => {
+    await assertSucceeds(crear(fecha(-28)));
+  });
+
   test('se rechaza un pase con el grupoId de otro grupo', async () => {
     const f = fecha(0);
     await assertFails(setDoc(doc(como('profe'), `pases/profe_g1_${f}`), pase('profe_g1', 'g2', 'profe', f)));

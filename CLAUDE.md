@@ -126,3 +126,10 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   npm (`npm i -g firebase-tools`) o corre las pruebas con `npx firebase-tools emulators:exec …`.
 - Las advertencias de AGP 9 sobre `org.jetbrains.kotlin.android` vienen de los plugins de Firebase; se
   pueden ignorar hasta que los actualicen.
+- **Fechas UTC contra fecha local:** las reglas comparan contra fechas en UTC y la app usa la fecha
+  local de México (detrás de UTC). El margen de un día en `editable()` (29 días contra la fecha UTC)
+  cubre la diferencia para que hoy−28 local se acepte a cualquier hora.
+- **`resource.data` y documentos que no existen:** una regla que lee `resource.data` niega la lectura
+  de un documento que no existe (`resource` es `null`). Para documentos que pueden no existir todavía
+  (por ejemplo el pase de hoy), se escucha una consulta filtrada igual que las reglas en vez del
+  documento.

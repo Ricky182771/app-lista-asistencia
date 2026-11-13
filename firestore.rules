@@ -12,10 +12,12 @@ service cloud.firestore {
       let p = fecha.split('-');
       return timestamp.date(int(p[0]), int(p[1]), int(p[2]));
     }
-    // true si la fecha no es futura y cae dentro de los últimos 28 días
+    // true si la fecha no es futura y cae dentro de los últimos 28 días.
+    // Se compara por día contra la fecha UTC con un día de margen (29): la app usa la fecha local
+    // de México, que va detrás de UTC, así que hoy−28 local nunca queda fuera a ninguna hora.
     function editable(fecha) {
       return fechaTs(fecha) <= request.time
-          && fechaTs(fecha) >= request.time - duration.value(28, 'd');
+          && fechaTs(fecha) >= request.time.date() - duration.value(29, 'd');
     }
 
     match /invitaciones/{email} {
