@@ -27,7 +27,14 @@ service cloud.firestore {
       allow create: if signedIn() && request.auth.uid == uid
         && request.auth.token.email_verified
         && exists(inv())
-        && request.resource.data.rol == get(inv()).data.rol;
+        && request.resource.data.rol == get(inv()).data.rol
+        && request.resource.data.keys().hasOnly(['nombre', 'email', 'fotoUrl', 'rol'])
+        && request.resource.data.email == correo()
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 1
+        && request.resource.data.nombre.size() <= 100
+        && (request.resource.data.get('fotoUrl', null) == null
+            || request.resource.data.fotoUrl is string);
       allow update, delete: if isRole('admin');
     }
 

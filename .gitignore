@@ -48,3 +48,6 @@ emulator-data/
 .DS_Store
 *.swp
 *.log
+
+# Pruebas de reglas (Node)
+node_modules/

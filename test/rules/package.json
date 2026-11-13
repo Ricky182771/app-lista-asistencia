@@ -1,0 +1,12 @@
+{
+  "name": "paselista-pruebas-reglas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node reglas.test.js"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.3.0"
+  }
+}
