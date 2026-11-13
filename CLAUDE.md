@@ -63,6 +63,8 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
 - **Un pase por clase por día.** Una materia que dura dos módulos seguidos es un solo pase.
 - `grupos.profesores` lo mantiene el admin en el mismo `WriteBatch` con el que crea o borra una clase;
   las reglas lo usan para que un profe solo lea sus grupos.
+- **Quitar acceso** = borrar `usuarios/{uid}` + `invitaciones/{correo}` en el mismo `WriteBatch`. Si
+  solo se borra el usuario, la invitación sigue y la persona se da de alta sola al volver a entrar.
 - Los IDs de `clases` y `pases` son **determinísticos** para que un reintento sin internet no duplique
   documentos.
 - Editar un pase es un `update()` que solo toca `estados` y `editadoEn`

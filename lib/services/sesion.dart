@@ -7,7 +7,8 @@ import '../models/rol.dart';
 
 final _db = FirebaseFirestore.instance;
 
-/// Android: el `serverClientId` sale del cliente web (tipo 3) de google-services.json.
+/// Android: no se pasa `serverClientId`. El plugin `com.google.gms.google-services` genera el
+/// recurso `default_web_client_id` desde google-services.json y `google_sign_in_android` lo toma de ahí.
 Future<void> iniciarGoogleSignIn() =>
     kIsWeb ? Future.value() : GoogleSignIn.instance.initialize();
 
@@ -28,8 +29,12 @@ Future<void> cerrarSesion() async {
   if (!kIsWeb) await GoogleSignIn.instance.signOut();
 }
 
+/// Un "cancelado" más rápido que esto no lo hizo el usuario: es el síntoma de la SHA-1 faltante.
+const umbralCancelacionSha1 = Duration(milliseconds: 1500);
+
 /// Mensaje para el usuario, o `null` si solo canceló.
-String? mensajeDeError(Object e) {
+/// [duracion] = tiempo entre tocar "Entrar con Google" y recibir el error.
+String? mensajeDeError(Object e, Duration duracion) {
   final texto = e.toString();
   // Credential Manager no siempre usa el mismo código para "falta la SHA-1"; ver README.
   final esSha1 = texto.contains('ApiException: 10') ||
@@ -44,9 +49,11 @@ String? mensajeDeError(Object e) {
         '(instrucciones en el README).';
   }
   if (e is GoogleSignInException && e.code == GoogleSignInExceptionCode.canceled) {
-    // En Android una SHA-1 faltante a veces llega como "cancelado" (README de google_sign_in_android).
-    return 'Se canceló el inicio de sesión. Si sí elegiste tu cuenta, '
-        'probablemente falta registrar la SHA-1 (ver README).';
+    // En Android una SHA-1 faltante a veces llega como "cancelado" (README de google_sign_in_android),
+    // pero casi al instante: el usuario no alcanza a ver el selector de cuentas.
+    if (duracion >= umbralCancelacionSha1) return null;
+    return 'Google cerró el inicio de sesión antes de que pudieras elegir tu cuenta. '
+        'Probablemente falta registrar la SHA-1 de esta compilación (ver README).';
   }
   if (e is FirebaseAuthException &&
       (e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request')) {
@@ -94,3 +101,22 @@ Future<void> invitar(String correo, Rol rol) =>
 
 Stream<QuerySnapshot<Map<String, dynamic>>> invitaciones() =>
     _db.collection('invitaciones').snapshots(includeMetadataChanges: true); // ordenadas por correo (id)
+
+/// Borra el usuario y su invitación juntos; si quedara la invitación, se daría de alta solo otra vez.
+/// Sin `await` a propósito (ver [invitar]); lo pendiente se ve en [usuarios] e [invitaciones].
+Future<void> quitarAcceso(String uid, String correo) {
+  final batch = _db.batch()..delete(_db.doc('usuarios/$uid'));
+  // Un usuario creado a mano en la consola puede no tener `email`.
+  if (normalizarCorreo(correo).isNotEmpty) {
+    batch.delete(_db.doc('invitaciones/${normalizarCorreo(correo)}'));
+  }
+  return batch.commit();
+}
+
+/// Para invitaciones que nadie ha usado. Sin `await` a propósito (ver [invitar]).
+Future<void> cancelarInvitacion(String correo) =>
+    _db.doc('invitaciones/${normalizarCorreo(correo)}').delete();
+
+/// Sin `orderBy`: ocultaría los documentos sin `nombre` (el primer admin se crea a mano).
+Stream<QuerySnapshot<Map<String, dynamic>>> usuarios() =>
+    _db.collection('usuarios').snapshots(includeMetadataChanges: true);
