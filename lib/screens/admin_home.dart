@@ -5,8 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/rol.dart';
+import '../services/grupos.dart';
 import '../services/sesion.dart';
 import 'datos_prueba.dart';
+import 'importar_csv.dart';
 import 'inicio.dart';
 
 class AdminHome extends StatefulWidget {
@@ -21,8 +23,8 @@ class _AdminHomeState extends State<AdminHome> {
   final _miUid = FirebaseAuth.instance.currentUser?.uid;
   // Suscripciones en el estado: el ListView de Inicio construye perezosamente y un StreamBuilder
   // creado tarde se perdería el primer snapshot.
-  QuerySnapshot<Map<String, dynamic>>? _usuarios, _invitaciones;
-  Object? _errorUsuarios, _errorInvitaciones;
+  QuerySnapshot<Map<String, dynamic>>? _usuarios, _invitaciones, _grupos;
+  Object? _errorUsuarios, _errorInvitaciones, _errorGrupos;
   late final List<StreamSubscription<void>> _subs;
 
   @override
@@ -36,6 +38,10 @@ class _AdminHomeState extends State<AdminHome> {
       invitaciones().listen(
         (s) => setState(() => _invitaciones = s),
         onError: (Object e) => setState(() => _errorInvitaciones = e),
+      ),
+      grupos().listen(
+        (s) => setState(() => _grupos = s),
+        onError: (Object e) => setState(() => _errorGrupos = e),
       ),
     ];
   }
@@ -102,7 +108,41 @@ class _AdminHomeState extends State<AdminHome> {
                     ),
             ),
         ]),
+        const SizedBox(height: 16),
+        Text('Grupos', style: titulo),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const ImportarCsv()),
+            ),
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Importar lista (CSV)'),
+          ),
+        ),
+        ..._seccion(_grupos, _errorGrupos, 'Aún no hay grupos.', [
+          for (final d in [...?_grupos?.docs]) _filaGrupo(d),
+        ]),
       ],
+    );
+  }
+
+  Widget _filaGrupo(QueryDocumentSnapshot<Map<String, dynamic>> d) {
+    final alumnos = d.data()['alumnos'];
+    final activos = alumnos is List
+        ? alumnos.where((a) => a is Map && a['activo'] != false).length
+        : 0;
+    return ListTile(
+      leading: Icon(
+        d.metadata.hasPendingWrites ? Icons.cloud_upload_outlined : Icons.groups_outlined,
+      ),
+      title: Text('${d.data()['nombre'] ?? d.id}'),
+      subtitle: Text([
+        activos == 1 ? '1 alumno' : '$activos alumnos',
+        if (d.metadata.hasPendingWrites) 'pendiente de sincronizar',
+      ].join(' · ')),
     );
   }
 
