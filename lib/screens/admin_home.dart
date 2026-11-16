@@ -8,6 +8,7 @@ import '../models/rol.dart';
 import '../services/grupos.dart';
 import '../services/sesion.dart';
 import 'datos_prueba.dart';
+import 'editar_grupo.dart';
 import 'importar_csv.dart';
 import 'inicio.dart';
 
@@ -143,6 +144,13 @@ class _AdminHomeState extends State<AdminHome> {
         activos == 1 ? '1 alumno' : '$activos alumnos',
         if (d.metadata.hasPendingWrites) 'pendiente de sincronizar',
       ].join(' · ')),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => EditarGrupo(grupoId: d.id, nombre: '${d.data()['nombre'] ?? d.id}'),
+        ),
+      ),
     );
   }
 

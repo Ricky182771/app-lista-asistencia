@@ -17,3 +17,14 @@ Future<void> crearGrupo(String id, String nombre, List<Alumno> alumnos) =>
       'alumnos': [for (final a in alumnos) a.toMap()],
       'profesores': <String>[],
     });
+
+/// Un grupo, para editarlo. Lo pendiente se ve con `metadata.hasPendingWrites`.
+Stream<DocumentSnapshot<Map<String, dynamic>>> grupo(String id) =>
+    _db.doc('grupos/$id').snapshots(includeMetadataChanges: true);
+
+/// Guarda la lista completa de un grupo que ya existe; solo toca `alumnos`.
+/// Sin `await` a propósito (ver [crearGrupo]). `update()` falla si el grupo ya no existe.
+Future<void> guardarAlumnos(String id, List<Alumno> alumnos) =>
+    _db.doc('grupos/$id').update({
+      'alumnos': [for (final a in alumnos) a.toMap()],
+    });
