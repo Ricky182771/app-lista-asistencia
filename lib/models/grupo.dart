@@ -56,7 +56,6 @@ class CambiosLista {
     required this.nuevos,
     required this.bajas,
     required this.renombrados,
-    required this.reactivados,
   });
 
   /// La lista como quedará guardada, ordenada por N.L. Nunca pierde un N.L de la lista anterior.
@@ -71,11 +70,7 @@ class CambiosLista {
   /// N.L que están en las dos listas con distinto nombre.
   final List<CambioNombre> renombrados;
 
-  /// N.L que estaban dados de baja y vuelven a venir en la lista nueva.
-  final List<Alumno> reactivados;
-
-  bool get sinCambios =>
-      nuevos.isEmpty && bajas.isEmpty && renombrados.isEmpty && reactivados.isEmpty;
+  bool get sinCambios => nuevos.isEmpty && bajas.isEmpty && renombrados.isEmpty;
 
   /// Por ejemplo: "3 nuevos, 1 dado de baja, 2 cambian de nombre".
   String get resumen {
@@ -86,13 +81,13 @@ class CambiosLista {
       if (bajas.isNotEmpty) parte(bajas.length, 'dado de baja', 'dados de baja'),
       if (renombrados.isNotEmpty)
         parte(renombrados.length, 'cambia de nombre', 'cambian de nombre'),
-      if (reactivados.isNotEmpty) parte(reactivados.length, 'reactivado', 'reactivados'),
     ].join(', ');
   }
 }
 
 /// Compara la lista guardada con la del CSV nuevo. El N.L es lo que une al alumno con su historial:
-/// - N.L en las dos listas: se actualiza el nombre (y se reactiva si estaba de baja);
+/// - N.L en las dos listas: se actualiza el nombre; quien estaba dado de baja sigue de baja
+///   (reactivar es una decisión del admin, se hace a mano);
 /// - N.L solo en la nueva: se agrega como activo;
 /// - N.L solo en la vieja: se marca `activo: false`, nunca se borra.
 CambiosLista compararListas(List<Alumno> actual, List<Alumno> nueva) {
@@ -102,18 +97,14 @@ CambiosLista compararListas(List<Alumno> actual, List<Alumno> nueva) {
   final nuevos = <Alumno>[];
   final bajas = <Alumno>[];
   final renombrados = <CambioNombre>[];
-  final reactivados = <Alumno>[];
 
   for (final a in nueva) {
-    final alumno = Alumno(num: a.num, nombre: a.nombre);
     final viejo = viejos[a.num];
+    final alumno = Alumno(num: a.num, nombre: a.nombre, activo: viejo?.activo ?? true);
     if (viejo == null) {
       nuevos.add(alumno);
-    } else {
-      if (viejo.nombre != a.nombre) {
-        renombrados.add(CambioNombre(num: a.num, antes: viejo.nombre, despues: a.nombre));
-      }
-      if (!viejo.activo) reactivados.add(alumno);
+    } else if (viejo.nombre != a.nombre) {
+      renombrados.add(CambioNombre(num: a.num, antes: viejo.nombre, despues: a.nombre));
     }
     resultado.add(alumno);
   }
@@ -128,7 +119,6 @@ CambiosLista compararListas(List<Alumno> actual, List<Alumno> nueva) {
     nuevos: nuevos..sort(porNum),
     bajas: bajas..sort(porNum),
     renombrados: renombrados..sort((a, b) => a.num.compareTo(b.num)),
-    reactivados: reactivados..sort(porNum),
   );
 }
 

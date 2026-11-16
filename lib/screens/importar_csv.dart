@@ -358,7 +358,6 @@ class _VistaCambios extends StatelessWidget {
     final textos = Theme.of(context).textTheme;
     final nuevos = {for (final a in cambios.nuevos) a.num};
     final bajas = {for (final a in cambios.bajas) a.num};
-    final reactivados = {for (final a in cambios.reactivados) a.num};
     final renombrados = {for (final c in cambios.renombrados) c.num: c};
     final activos = cambios.resultado.where((a) => a.activo).length;
     return Column(
@@ -404,8 +403,7 @@ class _VistaCambios extends StatelessWidget {
                     if (nuevos.contains(a.num)) 'Nuevo',
                     if (bajas.contains(a.num)) 'Se da de baja',
                     if (renombrados.containsKey(a.num)) 'Cambia de nombre',
-                    if (reactivados.contains(a.num)) 'Se reactiva',
-                    if (!a.activo && !bajas.contains(a.num)) 'Ya estaba de baja',
+                    if (!a.activo && !bajas.contains(a.num)) 'Sigue de baja',
                   ].join(' · '),
                   style: textos.bodySmall,
                 ),

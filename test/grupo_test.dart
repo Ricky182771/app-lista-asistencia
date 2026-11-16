@@ -110,12 +110,18 @@ void main() {
       expect(mapas(c.resultado), mapas([ana, luisBaja]));
     });
 
-    test('quien estaba de baja y vuelve a venir: se reactiva', () {
+    test('quien estaba de baja y vuelve a venir: sigue de baja, no se reactiva solo', () {
       const luisBaja = Alumno(num: 2, nombre: 'Luis', activo: false);
       final c = compararListas([ana, luisBaja], [ana, luis]);
-      expect(c.reactivados.map((a) => a.num), [2]);
-      expect(c.resumen, '1 reactivado');
-      expect(c.resultado[1].activo, isTrue);
+      expect(c.sinCambios, isTrue);
+      expect(mapas(c.resultado), mapas([ana, luisBaja]));
+    });
+
+    test('quien estaba de baja y viene con otro nombre: cambia el nombre y sigue de baja', () {
+      const luisBaja = Alumno(num: 2, nombre: 'Luis', activo: false);
+      final c = compararListas([ana, luisBaja], [ana, const Alumno(num: 2, nombre: 'Luis Fernando')]);
+      expect(c.resumen, '1 cambia de nombre');
+      expect(c.resultado[1].toMap(), {'num': 2, 'nombre': 'Luis Fernando', 'activo': false});
     });
 
     test('resumen con todo, como en la guía', () {
