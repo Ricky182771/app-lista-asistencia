@@ -88,12 +88,22 @@ String detectarSeparador(String texto) {
 }
 
 final _entero = RegExp(r'^\d+$');
-final _espacios = RegExp(r'\s+');
+String _limpiar(Object? celda) => limpiarNombre('${celda ?? ''}');
 
-String _limpiar(Object? celda) => '${celda ?? ''}'.replaceAll(_espacios, ' ').trim();
+/// Excel → "Texto Unicode" guarda en UTF-16 (empieza con `FF FE` o `FE FF`): no es UTF-8 y con
+/// latin1 saldría basura, así que se avisa en vez de mostrar una vista previa ilegible.
+bool _esUtf16(List<int> b) =>
+    b.length >= 2 && ((b[0] == 0xFF && b[1] == 0xFE) || (b[0] == 0xFE && b[1] == 0xFF));
 
 /// Lee los bytes de un CSV `N.L,Nombre completo` y devuelve las filas ya validadas (pasos 1 a 7).
 ListaCsv leerCsv(List<int> bytes) {
+  if (_esUtf16(bytes)) {
+    return const ListaCsv(
+      filas: [],
+      errorGeneral: 'El archivo está guardado como "Texto Unicode" (UTF-16). '
+          'En Excel usa Guardar como → "CSV UTF-8 (delimitado por comas)".',
+    );
+  }
   final texto = decodificar(bytes);
   // Paso 4: el paquete `csv` respeta las comillas (`3,"García Ruiz, Luis Fernando"`).
   final crudas = Csv(

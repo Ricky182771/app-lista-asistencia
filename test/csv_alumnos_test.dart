@@ -144,6 +144,15 @@ void main() {
       }
     });
 
+    test('UTF-16 ("Texto Unicode" de Excel): avisa cómo guardarlo en vez de mostrar basura', () {
+      for (final bom in [[0xFF, 0xFE], [0xFE, 0xFF]]) {
+        final lista = leerCsv([...bom, 0x31, 0x00, 0x2C, 0x00, 0x41, 0x00]);
+        expect(lista.valida, isFalse);
+        expect(lista.filas, isEmpty);
+        expect(lista.errorGeneral, contains('CSV UTF-8'));
+      }
+    });
+
     test('solo se descarta el encabezado de la primera fila', () {
       final lista = leer('No.,Nombre\n1,Ana\nx,Luis');
       expect(lista.filas, hasLength(2));
