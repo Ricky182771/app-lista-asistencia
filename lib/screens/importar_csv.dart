@@ -31,7 +31,8 @@ class _ImportarCsvState extends State<ImportarCsv> {
   /// Sale de la caché de Firestore, así que también funciona sin internet.
   Set<String>? _idsExistentes;
 
-  /// Reemplazo: la lista guardada hoy, para comparar. `null` mientras carga.
+  /// Reemplazo: la lista guardada hoy, para comparar. `null` mientras carga o si trae entradas
+  /// sin reconocer: sin ella no hay comparación y "Reemplazar lista" no se activa.
   List<Alumno>? _actual;
   Object? _errorGrupos;
 
@@ -48,7 +49,12 @@ class _ImportarCsvState extends State<ImportarCsv> {
     void alFallar(Object e) => setState(() => _errorGrupos = e);
     _sub = _reemplazo
         ? grupo(widget.grupoId!).listen(
-            (d) => setState(() => _actual = alumnosDe(d.data()?['alumnos'])),
+            (d) => setState(() {
+              final campo = d.data()?['alumnos'];
+              final legible = sinReconocer(campo) == 0;
+              _actual = legible ? alumnosDe(campo) : null;
+              _errorGrupos = legible ? null : avisoSinReconocer;
+            }),
             onError: alFallar,
           )
         : grupos().listen(
@@ -194,9 +200,11 @@ class _ImportarCsvState extends State<ImportarCsv> {
           if (_errorGrupos != null) ...[
             const SizedBox(height: 8),
             Text(
-              _reemplazo
-                  ? 'No se pudo cargar la lista guardada: $_errorGrupos'
-                  : 'No se pudo revisar si el grupo ya existe: $_errorGrupos',
+              _errorGrupos == avisoSinReconocer
+                  ? avisoSinReconocer
+                  : _reemplazo
+                      ? 'No se pudo cargar la lista guardada: $_errorGrupos'
+                      : 'No se pudo revisar si el grupo ya existe: $_errorGrupos',
               style: error,
             ),
           ],

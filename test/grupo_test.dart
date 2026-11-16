@@ -48,6 +48,43 @@ void main() {
         {'num': 3, 'nombre': 'Eva', 'activo': true},
       ]);
     });
+    test('acepta el N.L guardado como 3.0 (consola o web en WebAssembly)', () {
+      final campo = [
+        {'num': 3.0, 'nombre': 'Luis', 'activo': true},
+        {'num': 1, 'nombre': 'Ana', 'activo': true},
+      ];
+      final alumnos = alumnosDe(campo);
+      expect(alumnos.map((a) => a.num), [1, 3]);
+      expect(alumnos.last.num, isA<int>());
+      expect(alumnos.last.toMap(), {'num': 3, 'nombre': 'Luis', 'activo': true});
+      expect(sinReconocer(campo), 0);
+    });
+
+    test('una entrada inválida bloquea la edición: sinReconocer la cuenta', () {
+      const buenos = [
+        {'num': 1, 'nombre': 'Ana', 'activo': true},
+        {'num': 2.0, 'nombre': 'Luis'},
+      ];
+      expect(sinReconocer(buenos), 0);
+      expect(sinReconocer(null), 0, reason: 'sin el campo es una lista vacía');
+      expect(sinReconocer(const []), 0);
+      for (final mala in [
+        {'num': 3.5, 'nombre': 'Eva'},
+        {'num': '3', 'nombre': 'Eva'},
+        {'num': double.nan, 'nombre': 'Eva'},
+        {'num': 3},
+        {'num': 3, 'nombre': 7},
+        {'nombre': 'Eva'},
+        'Eva',
+        null,
+      ]) {
+        final campo = [...buenos, mala];
+        expect(sinReconocer(campo), 1, reason: '$mala');
+        expect(alumnosDe(campo), hasLength(2), reason: '$mala');
+      }
+      expect(sinReconocer('no es una lista'), 1);
+    });
+
     test('ignora lo que no es un alumno', () {
       expect(alumnosDe(null), isEmpty);
       expect(alumnosDe('x'), isEmpty);

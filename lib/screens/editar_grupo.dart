@@ -44,17 +44,21 @@ class _EditarGrupoState extends State<EditarGrupo> {
   String get _nombre => '${_grupo?.data()?['nombre'] ?? widget.nombre}';
   List<Alumno> get _alumnos => alumnosDe(_grupo?.data()?['alumnos']);
 
+  /// Con entradas sin reconocer no se edita: guardar reescribiría la lista sin ellas.
+  bool get _editable => sinReconocer(_grupo?.data()?['alumnos']) == 0;
+
   /// Sin `await`: sin internet el Future no se completa (ver CLAUDE.md); solo avisa si falla.
   void _guardar(List<Alumno> alumnos, String siFalla) =>
       avisarSiFalla(context, guardarAlumnos(widget.grupoId, alumnos), siFalla);
 
   Future<void> _agregar() async {
+    if (!_editable) return;
     final num = siguienteNum(_alumnos);
     final nombre = await showDialog<String>(
       context: context,
       builder: (_) => _DialogoNombre(titulo: 'Agregar alumno', ayuda: 'Tendrá el N.L $num.'),
     );
-    if (nombre == null || !mounted) return;
+    if (nombre == null || !mounted || !_editable) return;
     // Se vuelve a leer la lista: pudo cambiar mientras el diálogo estaba abierto.
     _guardar(agregarAlumno(_alumnos, nombre), 'No se agregó a $nombre');
   }
@@ -69,14 +73,17 @@ class _EditarGrupoState extends State<EditarGrupo> {
         inicial: a.nombre,
       ),
     );
-    if (nombre == null || nombre == a.nombre || !mounted) return;
+    if (nombre == null || nombre == a.nombre || !mounted || !_editable) return;
     _guardar(corregirNombre(_alumnos, a.num, nombre), 'No se corrigió el nombre del N.L ${a.num}');
   }
 
-  void _cambiarActivo(Alumno a, bool activo) => _guardar(
-        cambiarActivo(_alumnos, a.num, activo),
-        activo ? 'No se reactivó a ${a.nombre}' : 'No se dio de baja a ${a.nombre}',
-      );
+  void _cambiarActivo(Alumno a, bool activo) {
+    if (!_editable) return;
+    _guardar(
+      cambiarActivo(_alumnos, a.num, activo),
+      activo ? 'No se reactivó a ${a.nombre}' : 'No se dio de baja a ${a.nombre}',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,9 +105,18 @@ class _EditarGrupoState extends State<EditarGrupo> {
     final activos = alumnos.where((a) => a.activo).length;
     final bajas = alumnos.length - activos;
     final gris = Theme.of(context).colorScheme.outline;
+    final editable = _editable;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (!editable)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              avisoSinReconocer,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
         Text([
           activos == 1 ? '1 alumno activo' : '$activos alumnos activos',
           if (bajas > 0) bajas == 1 ? '1 dado de baja' : '$bajas dados de baja',
@@ -111,18 +127,22 @@ class _EditarGrupoState extends State<EditarGrupo> {
           runSpacing: 8,
           children: [
             FilledButton.icon(
-              onPressed: _agregar,
+              onPressed: editable ? _agregar : null,
               icon: const Icon(Icons.person_add_alt),
               label: const Text('Agregar alumno'),
             ),
             OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      ImportarCsv.reemplazar(grupoId: widget.grupoId, nombreGrupo: _nombre),
-                ),
-              ),
+              onPressed: !editable
+                  ? null
+                  : () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => ImportarCsv.reemplazar(
+                            grupoId: widget.grupoId,
+                            nombreGrupo: _nombre,
+                          ),
+                        ),
+                      ),
               icon: const Icon(Icons.upload_file),
               label: const Text('Reemplazar lista (CSV)'),
             ),
@@ -144,6 +164,7 @@ class _EditarGrupoState extends State<EditarGrupo> {
             title: Text(a.nombre, style: a.activo ? null : TextStyle(color: gris)),
             subtitle: a.activo ? null : const Text('Dado de baja'),
             trailing: PopupMenuButton<void Function()>(
+              enabled: editable,
               tooltip: 'Opciones',
               onSelected: (accion) => accion(),
               itemBuilder: (_) => [

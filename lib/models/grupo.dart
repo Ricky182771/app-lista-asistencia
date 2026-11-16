@@ -30,16 +30,39 @@ String idGrupo(String nombre) {
 /// Un nombre como se guarda: sin espacios al inicio o al final ni espacios dobles.
 String limpiarNombre(String nombre) => nombre.replaceAll(RegExp(r'\s+'), ' ').trim();
 
-/// Convierte el campo `alumnos` de Firestore, ordenado por N.L. Lo que no tenga `num` entero y
-/// `nombre` se ignora; sin `activo` se toma como activo.
+/// Una entrada de `alumnos`, o `null` si no se reconoce. El N.L puede venir como `3.0`: pasa con un
+/// número creado a mano en la consola y en la web compilada a WebAssembly, donde `int` y `double`
+/// son tipos distintos. Sin `activo` se toma como activo.
+Alumno? _alumnoDe(Object? a) {
+  if (a is! Map) return null;
+  final n = a['num'];
+  final nombre = a['nombre'];
+  if (n is! num || !n.isFinite || n != n.roundToDouble() || nombre is! String) return null;
+  return Alumno(num: n.toInt(), nombre: nombre, activo: a['activo'] != false);
+}
+
+/// Convierte el campo `alumnos` de Firestore, ordenado por N.L. Lo que no se reconoce no sale en
+/// la lista: antes de guardar cambios hay que revisar [sinReconocer].
 List<Alumno> alumnosDe(Object? campo) {
   if (campo is! List) return [];
   return [
-    for (final a in campo)
-      if (a is Map && a['num'] is int && a['nombre'] is String)
-        Alumno(num: a['num'] as int, nombre: a['nombre'] as String, activo: a['activo'] != false),
+    for (final a in campo) ?_alumnoDe(a),
   ]..sort((a, b) => a.num.compareTo(b.num));
 }
+
+/// Cuántas entradas del campo `alumnos` no reconoce [alumnosDe]. Si no es 0, el grupo no se debe
+/// editar: guardar reescribe la lista completa y esos alumnos se perderían junto con la liga a su
+/// historial. Un campo que falta cuenta como lista vacía; uno que no es lista, como no reconocido.
+int sinReconocer(Object? campo) {
+  if (campo == null) return 0;
+  if (campo is! List) return 1;
+  return campo.where((a) => _alumnoDe(a) == null).length;
+}
+
+/// El aviso que se muestra en vez de dejar editar un grupo con entradas sin reconocer.
+const avisoSinReconocer =
+    'Hay alumnos con datos que la app no reconoce; revisa el grupo en la consola de Firebase. '
+    'Mientras tanto no se puede editar, para no perderlos.';
 
 /// Un N.L cuyo nombre cambia al reemplazar la lista.
 class CambioNombre {
