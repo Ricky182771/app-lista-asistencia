@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 
 import '../models/grupo.dart';
 import '../services/grupos.dart';
+import 'clases_grupo.dart';
 import 'importar_csv.dart';
 import 'inicio.dart';
 
-/// Un grupo: su lista de alumnos, con reemplazo por CSV y edición a mano.
+/// Un grupo: sus clases y su lista de alumnos, con reemplazo por CSV y edición a mano.
 /// No hay forma de borrar a un alumno: se da de baja y conserva su N.L y su historial.
 class EditarGrupo extends StatefulWidget {
   const EditarGrupo({super.key, required this.grupoId, required this.nombre});
@@ -117,6 +118,10 @@ class _EditarGrupoState extends State<EditarGrupo> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
+        ClasesDelGrupo(grupoId: widget.grupoId, nombreGrupo: _nombre),
+        const SizedBox(height: 16),
+        Text('Alumnos', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
         Text([
           activos == 1 ? '1 alumno activo' : '$activos alumnos activos',
           if (bajas > 0) bajas == 1 ? '1 dado de baja' : '$bajas dados de baja',
