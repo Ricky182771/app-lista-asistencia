@@ -13,9 +13,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _entrando = false;
   String? _error;
-  // La caché de Firestore se configuró al cargar la página con este valor.
-  final bool _compartidaAlCargar = kIsWeb && computadoraCompartida();
-  late bool _compartida = _compartidaAlCargar;
+  // Siempre empieza marcada: lo guardado solo lo usa configurarWeb() al cargar la página.
+  bool _compartida = true;
 
   Future<void> _entrar() async {
     setState(() {
@@ -23,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     final reloj = Stopwatch()..start();
+    if (kIsWeb) guardarComputadoraCompartida(_compartida);
     try {
       await entrarConGoogle(compartida: _compartida); // authStateChanges() cambia la pantalla
     } catch (e) {
@@ -58,19 +58,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     value: _compartida,
                     onChanged: _entrando
                         ? null
-                        : (v) {
-                            guardarComputadoraCompartida(v!);
-                            setState(() => _compartida = v);
-                          },
+                        : (v) => setState(() => _compartida = v!),
                     controlAffinity: ListTileControlAffinity.leading,
                     title: const Text('Computadora compartida'),
-                    subtitle: Text([
-                      if (_compartida)
-                        'Tu sesión se cerrará al cerrar el navegador y no se guardarán datos '
-                            'en esta computadora.',
-                      if (_compartida != _compartidaAlCargar)
-                        'Recarga la página para aplicar el cambio a los datos guardados.',
-                    ].join(' ')),
+                    subtitle: _compartida
+                        ? const Text('Tu sesión se cerrará al cerrar el navegador y no se guardarán '
+                            'datos en esta computadora.')
+                        : null,
                   ),
                 ),
               ],

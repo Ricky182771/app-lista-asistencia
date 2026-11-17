@@ -83,11 +83,14 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   estado con `metadata.hasPendingWrites`. En web la persistencia en disco se activa solo si la
   computadora no es compartida (`configurarWeb()` en `lib/services/sesion.dart`, ver abajo).
 - **Computadoras compartidas (web):** "Entrar con Google" siempre muestra el selector de cuentas
-  (`prompt: select_account`). La casilla "Computadora compartida" viene marcada por defecto y se guarda en
-  `localStorage`; marcada, la sesión dura lo que la pestaña (`Persistence.SESSION`) y la caché de Firestore
-  vive solo en memoria (al cargar se borra la de IndexedDB). En ese modo, sin internet solo se conserva lo
-  que esté abierto en la pestaña: si se cierra o recarga, se pierde lo no sincronizado. El cambio de la
-  casilla aplica a Firestore desde la siguiente carga de la página.
+  (`prompt: select_account`). La casilla "Computadora compartida" siempre empieza marcada y la elección se
+  guarda en `localStorage` al tocar "Entrar con Google". Lo guardado solo lo usa `configurarWeb()` al cargar
+  la página: compartida = sesión de pestaña (`Persistence.SESSION`) y caché de Firestore solo en memoria
+  (además borra la de IndexedDB). En ese modo, sin internet solo se conserva lo que esté abierto en la
+  pestaña: si se cierra o recarga, se pierde lo no sincronizado.
+  **Riesgo que queda:** si un profe desmarca la casilla en una computadora compartida, la siguiente carga
+  de la página usa caché en disco, y los datos del siguiente profe pueden quedar en IndexedDB hasta la
+  carga siguiente, cuando `configurarWeb()` los borra (porque ese profe entró con la casilla marcada).
 - **Vista mensual del profe:** una columna por cada día que tiene pase (no se guarda horario), cabecera
   con la fecha `AAAA-MM-DD`. Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
   Las columnas de hace más de 28 días son de solo lectura.
