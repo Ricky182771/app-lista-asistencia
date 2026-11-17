@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'inicio.dart';
+import '../models/clase.dart';
 
 // Solo en depuración, mientras no exista el alta de grupos y clases (hito 2).
 // Nombres inventados: los de test/fixtures/csv/01_utf8_bom_excel.csv. Nada de datos reales.
@@ -42,6 +42,16 @@ Future<void> crearDatosPrueba(String profesorUid) => (_db.batch()
         'salon': 'A1',
       }))
     .commit();
+
+/// ¿El profe ya tiene Matemáticas en Prueba 3A, con cualquier ID (viejo, nuevo o de prueba)? Sin
+/// internet `get()` responde con la caché.
+Future<bool> yaTieneMatematicas(String profesorUid) async {
+  final clases = await _db.collection('clases').where('grupoId', isEqualTo: _grupoId).get();
+  return materiaRepetida(
+    [for (final d in clases.docs) ?claseDe(d.id, d.data())],
+    Clase(id: '', profesorUid: profesorUid, grupoId: _grupoId, materia: 'Matemáticas', salon: 'A1'),
+  );
+}
 
 class BotonDatosPrueba extends StatelessWidget {
   const BotonDatosPrueba({super.key});
@@ -91,9 +101,20 @@ class _DialogoDatosPrueba extends StatelessWidget {
                   ListTile(
                     title: Text('${d.data()['nombre'] ?? d.id}'),
                     subtitle: Text('${d.data()['email'] ?? ''}'),
-                    onTap: () {
-                      avisarSiFalla(context, crearDatosPrueba(d.id), 'No se crearon los datos de prueba');
+                    onTap: () async {
+                      final avisos = ScaffoldMessenger.of(context);
+                      void avisar(String m) => avisos.showSnackBar(SnackBar(content: Text(m)));
                       Navigator.pop(context);
+                      try {
+                        if (await yaTieneMatematicas(d.id)) {
+                          return avisar('Ese profe ya tiene Matemáticas en Prueba 3A');
+                        }
+                      } catch (e) {
+                        return avisar('No se crearon los datos de prueba: $e');
+                      }
+                      // Sin `await`: sin internet el Future no se completa (ver CLAUDE.md).
+                      crearDatosPrueba(d.id)
+                          .catchError((Object e) => avisar('No se crearon los datos de prueba: $e'));
                     },
                   ),
               ],
