@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../models/rol.dart';
+import 'almacen_local.dart' if (dart.library.js_interop) 'almacen_local_web.dart';
 
 final _db = FirebaseFirestore.instance;
 
@@ -12,10 +13,46 @@ final _db = FirebaseFirestore.instance;
 Future<void> iniciarGoogleSignIn() =>
     kIsWeb ? Future.value() : GoogleSignIn.instance.initialize();
 
+const _claveCompartida = 'paselista.computadoraCompartida';
+
+/// Web: sin nada guardado cuenta como compartida (lo más seguro en un laboratorio).
+bool esCompartida(String? guardado) => guardado != 'no';
+
+bool computadoraCompartida() => esCompartida(leerLocal(_claveCompartida));
+
+void guardarComputadoraCompartida(bool compartida) =>
+    guardarLocal(_claveCompartida, compartida ? 'si' : 'no');
+
+/// Compartida: la sesión dura lo que la pestaña y la caché de Firestore vive solo en memoria.
+({Persistence auth, bool cacheEnDisco}) configuracionWeb(bool compartida) => compartida
+    ? (auth: Persistence.SESSION, cacheEnDisco: false)
+    : (auth: Persistence.LOCAL, cacheEnDisco: true);
+
+/// Web, en `main()` antes de cualquier uso de Firestore.
+Future<void> configurarWeb() async {
+  final config = configuracionWeb(computadoraCompartida());
+  // Pasa a sesión de pestaña también a quien ya había entrado antes de este cambio.
+  await FirebaseAuth.instance.setPersistence(config.auth);
+  // Primero `settings`: la instancia de Firestore se crea en el primer uso, y `clearPersistence()` ya cuenta.
+  _db.settings = Settings(persistenceEnabled: config.cacheEnDisco);
+  if (config.cacheEnDisco) return;
+  try {
+    // Borra lo que dejó en IndexedDB alguien que entró sin la casilla. Si otra pestaña tiene la base
+    // abierta, el borrado se queda esperando: mejor seguir que dejar la app cargando.
+    await _db.clearPersistence().timeout(const Duration(seconds: 3));
+  } catch (e) {
+    debugPrint('No se pudo borrar la caché de Firestore: $e');
+  }
+}
+
 /// Solo pide `openid email profile` (lo que Google da por defecto).
+/// Web: la persistencia de Auth ya la fijó `LoginScreen` con la casilla "Computadora compartida".
 Future<void> entrarConGoogle() async {
   if (kIsWeb) {
-    await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+    // Sin ningún `await` antes: Safari bloquea la ventana emergente si no se abre justo al tocar el botón.
+    // Siempre pregunta la cuenta: en los laboratorios hay varias en el mismo Chrome.
+    await FirebaseAuth.instance.signInWithPopup(
+        GoogleAuthProvider()..setCustomParameters({'prompt': 'select_account'}));
     return;
   }
   final cuenta = await GoogleSignIn.instance.authenticate();
