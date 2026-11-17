@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -17,10 +16,8 @@ import 'services/sesion.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // En Android la caché offline ya viene activada; en web hay que pedirla.
-  if (kIsWeb) {
-    FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
-  }
+  // En Android la caché offline ya viene activada; en web depende de la casilla de computadora compartida.
+  if (kIsWeb) await configurarWeb();
   await iniciarGoogleSignIn();
   runApp(const PaseListaApp());
 }

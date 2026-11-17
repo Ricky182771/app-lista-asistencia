@@ -80,8 +80,14 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
 
 - **Sin internet:** el profe pasa lista y edita igual. Firestore guarda en caché y sincroniza solo. **No
   esperes con `await` el `set()`/`update()`**: el `Future` no se completa sin conexión. Muestra el
-  estado con `metadata.hasPendingWrites`. En web hay que activar la persistencia:
-  `FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);`
+  estado con `metadata.hasPendingWrites`. En web la persistencia en disco se activa solo si la
+  computadora no es compartida (`configurarWeb()` en `lib/services/sesion.dart`, ver abajo).
+- **Computadoras compartidas (web):** "Entrar con Google" siempre muestra el selector de cuentas
+  (`prompt: select_account`). La casilla "Computadora compartida" viene marcada por defecto y se guarda en
+  `localStorage`; marcada, la sesión dura lo que la pestaña (`Persistence.SESSION`) y la caché de Firestore
+  vive solo en memoria (al cargar se borra la de IndexedDB). En ese modo, sin internet solo se conserva lo
+  que esté abierto en la pestaña: si se cierra o recarga, se pierde lo no sincronizado. El cambio de la
+  casilla aplica a Firestore desde la siguiente carga de la página.
 - **Vista mensual del profe:** una columna por cada día que tiene pase (no se guarda horario), cabecera
   con la fecha `AAAA-MM-DD`. Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
   Las columnas de hace más de 28 días son de solo lectura.
