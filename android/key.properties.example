@@ -1,0 +1,6 @@
+# Copia este archivo como android/key.properties (está en .gitignore) y llena los valores.
+# La llave (.jks) va FUERA del repo; usa la ruta absoluta.
+storeFile=/home/USUARIO/paselista-release.jks
+storePassword=CONTRASEÑA_DEL_ALMACEN
+keyAlias=paselista
+keyPassword=CONTRASEÑA_DE_LA_LLAVE

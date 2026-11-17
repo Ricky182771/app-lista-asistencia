@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -5,6 +7,14 @@ plugins {
     // END: FlutterFire Configuration
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Llave de release: android/key.properties (ignorado por git; ver key.properties.example).
+// Sin ese archivo (por ejemplo, en la compu de un compañero) el release se firma con la llave de
+// depuración, para que `flutter run --release` siga funcionando; ese APK NO sirve para repartir.
+val llaveRelease = Properties().apply {
+    val archivo = rootProject.file("key.properties")
+    if (archivo.exists()) archivo.inputStream().use { load(it) }
 }
 
 android {
@@ -32,11 +42,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (!llaveRelease.isEmpty) {
+                storeFile = file(llaveRelease.getProperty("storeFile"))
+                storePassword = llaveRelease.getProperty("storePassword")
+                keyAlias = llaveRelease.getProperty("keyAlias")
+                keyPassword = llaveRelease.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (llaveRelease.isEmpty) {
+                logger.warn("android/key.properties no existe: el release se firma con la llave de depuración.")
+                signingConfig = signingConfigs.getByName("debug")
+            } else {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }
