@@ -22,10 +22,11 @@ const _sinAcento = {
 /// ID del documento a partir del nombre del grupo: minúsculas, sin acentos y con guiones en vez de
 /// espacios ("IA 3A" → "ia-3a"). Cualquier otro símbolo también se vuelve guion, porque una `/` en
 /// el ID cambiaría la ruta del documento. Devuelve '' si el nombre no deja nada utilizable.
-String idGrupo(String nombre) {
-  final sinAcentos = nombre.trim().toLowerCase().split('').map((c) => _sinAcento[c] ?? c).join();
-  return sinAcentos.replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
-}
+String idGrupo(String nombre) =>
+    sinAcentos(nombre.trim()).replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
+
+/// En minúsculas y sin acentos, para comparar textos como los escribe la gente.
+String sinAcentos(String texto) => texto.toLowerCase().split('').map((c) => _sinAcento[c] ?? c).join();
 
 /// Un nombre como se guarda: sin espacios al inicio o al final ni espacios dobles.
 String limpiarNombre(String nombre) => nombre.replaceAll(RegExp(r'\s+'), ' ').trim();

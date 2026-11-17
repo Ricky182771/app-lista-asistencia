@@ -44,9 +44,8 @@ void main() {
     });
   });
 
-  test('IDs determinísticos', () {
-    expect(claseId('uidProfe', 'prueba-3a'), 'uidProfe_prueba-3a');
-    expect(paseId('uidProfe_prueba-3a', '2026-11-13'), 'uidProfe_prueba-3a_2026-11-13');
+  test('paseId es determinístico: {claseId}_{fecha}', () {
+    expect(paseId('aB3xK9', '2026-11-13'), 'aB3xK9_2026-11-13');
   });
 
   const alumnos = [

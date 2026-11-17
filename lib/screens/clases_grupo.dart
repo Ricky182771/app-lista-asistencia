@@ -8,7 +8,7 @@ import '../models/grupo.dart';
 import '../services/clases.dart';
 import 'inicio.dart';
 
-/// Las clases de un grupo, con su profe y materia, y el alta y el borrado de clases.
+/// Las clases de un grupo, con su profe y materia, y el alta, la edición y el borrado de clases.
 /// Va dentro de la pantalla del grupo, así que el grupo de la clase es el que está abierto.
 class ClasesDelGrupo extends StatefulWidget {
   const ClasesDelGrupo({super.key, required this.grupoId, required this.nombreGrupo});
@@ -48,30 +48,36 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
       };
 
   List<Clase> get _lista => ordenarClases(
-        [for (final d in [...?_clases?.docs]) ?claseDe(d.data())],
+        [for (final d in [...?_clases?.docs]) ?claseDe(d.id, d.data())],
         _nombres,
       );
 
-  Future<void> _darDeAlta() async {
+  /// Alta si [editar] es `null`; si no, corrige la materia y el salón de esa clase.
+  Future<void> _abrirDialogo([Clase? editar]) async {
     final clase = await showDialog<Clase>(
       context: context,
       builder: (_) => _DialogoClase(
         grupoId: widget.grupoId,
         nombreGrupo: widget.nombreGrupo,
         profesores: [...?_profesores?.docs],
-        conClase: {for (final c in _lista) c.profesorUid},
+        clases: _lista,
+        editar: editar,
       ),
     );
     if (clase == null || !mounted) return;
-    // Se vuelve a revisar: la lista pudo cambiar con el diálogo abierto, y `set()` reemplazaría.
-    if (_lista.any((c) => c.id == clase.id)) {
+    // Se vuelve a revisar: la lista pudo cambiar con el diálogo abierto.
+    if (materiaRepetida(_lista, clase)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ese profesor ya tiene una clase con este grupo.')),
+        SnackBar(content: Text('Ese profesor ya da ${clase.materia} a este grupo.')),
       );
       return;
     }
     // Sin `await`: sin internet el Future no se completa (ver CLAUDE.md); solo avisa si falla.
-    avisarSiFalla(context, darDeAltaClase(clase), 'No se dio de alta la clase de ${clase.materia}');
+    if (editar == null) {
+      avisarSiFalla(context, darDeAltaClase(clase), 'No se dio de alta la clase de ${clase.materia}');
+    } else {
+      avisarSiFalla(context, editarClase(clase), 'No se guardaron los cambios de la clase de ${clase.materia}');
+    }
   }
 
   Future<void> _confirmarBorrar(Clase clase, String profesor) async {
@@ -91,7 +97,11 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
       ),
     );
     if (ok != true || !mounted) return;
-    avisarSiFalla(context, borrarClase(clase), 'No se borró la clase de ${clase.materia}');
+    avisarSiFalla(
+      context,
+      borrarClase(clase, quitarProfe: quitarProfeDelGrupo(_lista, clase)),
+      'No se borró la clase de ${clase.materia}',
+    );
   }
 
   @override
@@ -105,7 +115,7 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
         Text('Clases', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         FilledButton.icon(
-          onPressed: cargando || _error != null ? null : _darDeAlta,
+          onPressed: cargando || _error != null ? null : () => _abrirDialogo(),
           icon: const Icon(Icons.add),
           label: const Text('Dar de alta clase'),
         ),
@@ -131,10 +141,20 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
                 leading: const Icon(Icons.class_outlined),
                 title: Text(nombres[c.profesorUid] ?? 'Profesor que ya no tiene acceso'),
                 subtitle: Text('${c.materia} · Salón ${c.salon}'),
-                trailing: IconButton(
-                  tooltip: 'Borrar clase',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _confirmarBorrar(c, nombres[c.profesorUid] ?? 'El profesor'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Editar clase',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => _abrirDialogo(c),
+                    ),
+                    IconButton(
+                      tooltip: 'Borrar clase',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _confirmarBorrar(c, nombres[c.profesorUid] ?? 'El profesor'),
+                    ),
+                  ],
                 ),
               ),
         ],
@@ -143,29 +163,32 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
   }
 }
 
-/// Pide profesor, materia y salón; devuelve la [Clase] o `null` si se cancela.
+/// Pide profesor, materia y salón; devuelve la [Clase] o `null` si se cancela. Con [editar] el
+/// profesor queda fijo y la clase conserva su ID.
 class _DialogoClase extends StatefulWidget {
   const _DialogoClase({
     required this.grupoId,
     required this.nombreGrupo,
     required this.profesores,
-    required this.conClase,
+    required this.clases,
+    this.editar,
   });
   final String grupoId;
   final String nombreGrupo;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> profesores;
 
-  /// Profes que ya tienen clase con este grupo: no se pueden elegir (una clase = profe + grupo).
-  final Set<String> conClase;
+  /// Las clases del grupo, para no repetir el mismo profe con la misma materia.
+  final List<Clase> clases;
+  final Clase? editar;
 
   @override
   State<_DialogoClase> createState() => _DialogoClaseState();
 }
 
 class _DialogoClaseState extends State<_DialogoClase> {
-  final _materia = TextEditingController();
-  final _salon = TextEditingController();
-  String? _profesorUid;
+  late final _materia = TextEditingController(text: widget.editar?.materia);
+  late final _salon = TextEditingController(text: widget.editar?.salon);
+  late String? _profesorUid = widget.editar?.profesorUid;
   String? _errorProfesor, _errorMateria, _errorSalon;
 
   @override
@@ -182,55 +205,64 @@ class _DialogoClaseState extends State<_DialogoClase> {
       _errorSalon = errorEtiqueta(_salon.text, 'el salón');
     });
     if (_errorProfesor != null || _errorMateria != null || _errorSalon != null) return;
-    Navigator.pop(
-      context,
-      Clase(
-        profesorUid: _profesorUid!,
-        grupoId: widget.grupoId,
-        materia: limpiarNombre(_materia.text),
-        salon: limpiarNombre(_salon.text),
-      ),
+    final clase = Clase(
+      id: widget.editar?.id ?? '',
+      profesorUid: _profesorUid!,
+      grupoId: widget.grupoId,
+      materia: limpiarNombre(_materia.text),
+      salon: limpiarNombre(_salon.text),
     );
+    if (materiaRepetida(widget.clases, clase)) {
+      setState(() => _errorMateria = 'Este profesor ya da esa materia a este grupo.');
+      return;
+    }
+    Navigator.pop(context, clase);
   }
 
   @override
   Widget build(BuildContext context) {
     final profesores = [...widget.profesores]
       ..sort((a, b) => '${a.data()['nombre']}'.toLowerCase().compareTo('${b.data()['nombre']}'.toLowerCase()));
+    final editado = profesores.where((d) => d.id == widget.editar?.profesorUid).firstOrNull?.data();
     return AlertDialog(
-      title: Text('Dar de alta clase de ${widget.nombreGrupo}'),
+      title: Text('${widget.editar == null ? 'Dar de alta' : 'Editar'} clase de ${widget.nombreGrupo}'),
       content: SizedBox(
         width: 400,
-        child: profesores.isEmpty
+        child: profesores.isEmpty && widget.editar == null
             ? const Text('No hay usuarios con rol de profesor. Invítalos primero con '
                 '"Invitar usuario" y pídeles que entren a la app una vez.')
             : SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField<String>(
-                      initialValue: _profesorUid,
-                      isExpanded: true,
-                      decoration: InputDecoration(labelText: 'Profesor', errorText: _errorProfesor),
-                      items: [
-                        for (final d in profesores)
-                          DropdownMenuItem(
-                            value: d.id,
-                            enabled: !widget.conClase.contains(d.id),
-                            child: Text(
-                              [
+                    // Al editar, el profe no cambia (otro profe sería otra clase) y puede que ya no
+                    // esté en la lista si perdió el acceso.
+                    if (widget.editar != null)
+                      InputDecorator(
+                        decoration: const InputDecoration(labelText: 'Profesor'),
+                        child: Text(
+                          editado == null
+                              ? 'Profesor que ya no tiene acceso'
+                              : '${editado['nombre'] ?? editado['email']}',
+                        ),
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        initialValue: _profesorUid,
+                        isExpanded: true,
+                        decoration: InputDecoration(labelText: 'Profesor', errorText: _errorProfesor),
+                        items: [
+                          for (final d in profesores)
+                            DropdownMenuItem(
+                              value: d.id,
+                              child: Text(
                                 '${d.data()['nombre'] ?? d.data()['email'] ?? d.id}',
-                                if (widget.conClase.contains(d.id)) '(ya tiene clase con este grupo)',
-                              ].join(' '),
-                              overflow: TextOverflow.ellipsis,
-                              style: widget.conClase.contains(d.id)
-                                  ? TextStyle(color: Theme.of(context).disabledColor)
-                                  : null,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                      ],
-                      onChanged: (uid) => setState(() => _profesorUid = uid),
-                    ),
+                        ],
+                        onChanged: (uid) => setState(() => _profesorUid = uid),
+                      ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _materia,
@@ -260,8 +292,8 @@ class _DialogoClaseState extends State<_DialogoClase> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        if (profesores.isNotEmpty)
-          FilledButton(onPressed: _aceptar, child: const Text('Dar de alta')),
+        if (profesores.isNotEmpty || widget.editar != null)
+          FilledButton(onPressed: _aceptar, child: Text(widget.editar == null ? 'Dar de alta' : 'Guardar')),
       ],
     );
   }

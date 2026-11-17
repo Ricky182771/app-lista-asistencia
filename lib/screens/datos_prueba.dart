@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../models/pase.dart';
 import 'inicio.dart';
 
 // Solo en depuración, mientras no exista el alta de grupos y clases (hito 2).
@@ -22,7 +21,8 @@ const _grupoId = 'prueba-3a';
 final _db = FirebaseFirestore.instance;
 
 /// Grupo "Prueba 3A", su clase de Matemáticas y el profe en `grupos.profesores`, en un solo batch.
-/// IDs fijos y `arrayUnion`: repetirlo o hacerlo para otro profe no duplica ni quita a nadie.
+/// IDs fijos y `arrayUnion`: repetirlo o hacerlo para otro profe no duplica ni quita a nadie. La clase
+/// usa un ID fijo de prueba por profe (las de verdad tienen un ID generado por Firestore).
 Future<void> crearDatosPrueba(String profesorUid) => (_db.batch()
       ..set(
         _db.doc('grupos/$_grupoId'),
@@ -35,7 +35,7 @@ Future<void> crearDatosPrueba(String profesorUid) => (_db.batch()
         },
         SetOptions(merge: true),
       )
-      ..set(_db.doc('clases/${claseId(profesorUid, _grupoId)}'), {
+      ..set(_db.doc('clases/prueba-matematicas-$profesorUid'), {
         'profesorUid': profesorUid,
         'grupoId': _grupoId,
         'materia': 'Matemáticas',

@@ -2,45 +2,58 @@
 
 import 'grupo.dart';
 
-/// Una clase = un profesor + un grupo. La materia es solo una etiqueta y el salón es el de siempre
-/// (el profe lo puede corregir al pasar lista), así que ninguno de los dos forma parte del ID.
+/// Una clase = un profesor + un grupo + una materia. El ID lo genera Firestore al dar de alta, así
+/// la materia y el salón se pueden corregir sin cambiarlo (los pases `{claseId}_{fecha}` dependen de
+/// él). Las clases viejas con ID `{profesorUid}_{grupoId}` siguen sirviendo: todo usa el ID del documento.
 class Clase {
   const Clase({
+    required this.id,
     required this.profesorUid,
     required this.grupoId,
     required this.materia,
     required this.salon,
   });
+
+  /// `''` en una clase que aún no se da de alta.
+  final String id;
   final String profesorUid;
   final String grupoId;
   final String materia;
   final String salon;
 
-  /// ID determinístico de `clases/{id}`: repetir el alta sin internet no duplica la clase.
-  String get id => idClase(profesorUid, grupoId);
-
   Map<String, dynamic> toMap() =>
       {'profesorUid': profesorUid, 'grupoId': grupoId, 'materia': materia, 'salon': salon};
 }
 
-/// `{profesorUid}_{grupoId}`. Es la misma fórmula que `claseId` de `pase.dart` (las reglas y los
-/// pases dependen de ella); `clase_test.dart` comprueba que no se separen.
-String idClase(String profesorUid, String grupoId) => '${profesorUid}_$grupoId';
-
-/// Convierte un documento de `clases`; `null` si le falta el profesor o el grupo.
-Clase? claseDe(Map<String, dynamic>? datos) {
+/// Convierte el documento `clases/{id}`; `null` si le falta el profesor o el grupo.
+Clase? claseDe(String id, Map<String, dynamic>? datos) {
   final profesorUid = datos?['profesorUid'];
   final grupoId = datos?['grupoId'];
   if (profesorUid is! String || profesorUid.isEmpty || grupoId is! String || grupoId.isEmpty) {
     return null;
   }
   return Clase(
+    id: id,
     profesorUid: profesorUid,
     grupoId: grupoId,
     materia: '${datos?['materia'] ?? ''}',
     salon: '${datos?['salon'] ?? ''}',
   );
 }
+
+/// ¿Otra de [clases] ya es de ese profe con esa materia? Compara sin espacios de sobra, mayúsculas
+/// ni acentos ("matematicas " = "Matemáticas"). Ignora la que tiene el ID de [clase]: al editarla no
+/// choca consigo misma.
+bool materiaRepetida(Iterable<Clase> clases, Clase clase) {
+  String llave(String materia) => sinAcentos(limpiarNombre(materia));
+  return clases.any((c) =>
+      c.id != clase.id && c.profesorUid == clase.profesorUid && llave(c.materia) == llave(clase.materia));
+}
+
+/// Al borrar [borrada], ¿se quita al profe de `grupos.profesores`? Solo si ya no le queda otra clase
+/// con el grupo; si no, dejaría de ver el grupo de la otra. [delGrupo] = las clases de ese grupo.
+bool quitarProfeDelGrupo(Iterable<Clase> delGrupo, Clase borrada) =>
+    !delGrupo.any((c) => c.id != borrada.id && c.profesorUid == borrada.profesorUid);
 
 /// Largo máximo de la materia y del salón: son etiquetas que se ven en una línea.
 const maxEtiqueta = 40;
