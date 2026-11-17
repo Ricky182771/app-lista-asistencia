@@ -70,15 +70,15 @@ class _ConSesion extends StatefulWidget {
 }
 
 class _ConSesionState extends State<_ConSesion> {
-  late Future<Map<String, dynamic>?> _usuario = cargarUsuario(widget.user);
+  late Stream<Map<String, dynamic>?> _usuario = escucharUsuario(widget.user);
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: _usuario,
+    return StreamBuilder(
+      stream: _usuario,
       builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) return _cargando;
         if (snap.hasError) return _errorCarga(snap.error!);
+        if (snap.connectionState == ConnectionState.waiting) return _cargando;
         final usuario = snap.data;
         return switch (decidirPantalla(conSesion: true, usuario: usuario)) {
           Pantalla.profesor => ProfesorHome(usuario: usuario!),
@@ -101,7 +101,7 @@ class _ConSesionState extends State<_ConSesion> {
               Text('No se pudo cargar tu cuenta.\n$error', textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton(
-                onPressed: () => setState(() => _usuario = cargarUsuario(widget.user)),
+                onPressed: () => setState(() => _usuario = escucharUsuario(widget.user)),
                 child: const Text('Reintentar'),
               ),
               const SizedBox(height: 8),

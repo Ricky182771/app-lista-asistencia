@@ -85,6 +85,12 @@ void main() {
     expect(camposEditados(guardados, {}), isEmpty);
   });
 
+  test('camposEditados contra estadosIniciales: pase nuevo tocado y regresado a presente no tiene cambios', () {
+    final iniciales = estadosIniciales(alumnos);
+    expect(camposEditados(iniciales, {'1': presente, '3': presente}), isEmpty);
+    expect(camposEditados(iniciales, {'1': presente, '3': falta}), {'estados.3': falta});
+  });
+
   test('rangoDelMes: del día 1 al primer día del mes siguiente, también en diciembre', () {
     expect(rangoDelMes(2026, 11), (desde: '2026-11-01', hasta: '2026-12-01'));
     expect(rangoDelMes(2026, 12), (desde: '2026-12-01', hasta: '2027-01-01'));

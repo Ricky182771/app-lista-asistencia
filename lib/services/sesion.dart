@@ -91,6 +91,20 @@ Future<Map<String, dynamic>?> cargarUsuario(User user) async {
   return usuario;
 }
 
+/// Escucha `usuarios/{uid}` (sin internet sale de la caché). Si no existe al entrar, hace el alta por
+/// invitación con [cargarUsuario]; si desaparece después (le quitaron el acceso), emite `null`.
+Stream<Map<String, dynamic>?> escucharUsuario(User user) async* {
+  var primero = true;
+  await for (final doc in _db.doc('usuarios/${user.uid}').snapshots()) {
+    if (doc.exists) {
+      yield doc.data();
+    } else {
+      yield primero ? await cargarUsuario(user) : null;
+    }
+    primero = false;
+  }
+}
+
 /// Sin `await` a propósito: sin internet el Future no se completa (ver CLAUDE.md).
 /// Lo pendiente se ve con `metadata.hasPendingWrites` en [invitaciones].
 Future<void> invitar(String correo, Rol rol) =>

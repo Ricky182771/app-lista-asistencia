@@ -125,4 +125,19 @@ void main() {
       expect((r.conPase, r.clases), (0, 1));
     });
   });
+
+  group('revisarGrupo', () {
+    final sinPase = resumenDelGrupo({'a'}, []);
+    test('se resalta si tiene clases, no hay pase y alguien más sí pasó lista', () {
+      expect(revisarGrupo(sinPase, hayPasesEnLaEscuela: true), isTrue);
+    });
+    test('día sin ningún pase en la escuela: no se resalta', () {
+      expect(revisarGrupo(sinPase, hayPasesEnLaEscuela: false), isFalse);
+    });
+    test('con pase de la mañana o sin clases: no se resalta', () {
+      final conPase = resumenDelGrupo({'a'}, [pase('a', 7, 0, {})]);
+      expect(revisarGrupo(conPase, hayPasesEnLaEscuela: true), isFalse);
+      expect(revisarGrupo(resumenDelGrupo({}, []), hayPasesEnLaEscuela: true), isFalse);
+    });
+  });
 }
