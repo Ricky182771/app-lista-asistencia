@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -16,6 +17,17 @@ class _LoginScreenState extends State<LoginScreen> {
   // Siempre empieza marcada: lo guardado solo lo usa configurarWeb() al cargar la página.
   bool _compartida = true;
 
+  @override
+  void initState() {
+    super.initState();
+    _aplicarPersistencia();
+  }
+
+  // Aquí y no en entrarConGoogle(): un `await` antes del popup hace que Safari lo bloquee.
+  void _aplicarPersistencia() {
+    if (kIsWeb) FirebaseAuth.instance.setPersistence(configuracionWeb(_compartida).auth);
+  }
+
   Future<void> _entrar() async {
     setState(() {
       _entrando = true;
@@ -24,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final reloj = Stopwatch()..start();
     if (kIsWeb) guardarComputadoraCompartida(_compartida);
     try {
-      await entrarConGoogle(compartida: _compartida); // authStateChanges() cambia la pantalla
+      await entrarConGoogle(); // authStateChanges() cambia la pantalla
     } catch (e) {
       if (mounted) setState(() => _error = mensajeDeError(e, reloj.elapsed));
     } finally {
@@ -58,7 +70,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     value: _compartida,
                     onChanged: _entrando
                         ? null
-                        : (v) => setState(() => _compartida = v!),
+                        : (v) {
+                            setState(() => _compartida = v!);
+                            _aplicarPersistencia();
+                          },
                     controlAffinity: ListTileControlAffinity.leading,
                     title: const Text('Computadora compartida'),
                     subtitle: _compartida

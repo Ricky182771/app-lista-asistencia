@@ -46,10 +46,10 @@ Future<void> configurarWeb() async {
 }
 
 /// Solo pide `openid email profile` (lo que Google da por defecto).
-/// [compartida] solo cuenta en web (casilla "Computadora compartida").
-Future<void> entrarConGoogle({bool compartida = true}) async {
+/// Web: la persistencia de Auth ya la fijó `LoginScreen` con la casilla "Computadora compartida".
+Future<void> entrarConGoogle() async {
   if (kIsWeb) {
-    await FirebaseAuth.instance.setPersistence(configuracionWeb(compartida).auth);
+    // Sin ningún `await` antes: Safari bloquea la ventana emergente si no se abre justo al tocar el botón.
     // Siempre pregunta la cuenta: en los laboratorios hay varias en el mismo Chrome.
     await FirebaseAuth.instance.signInWithPopup(
         GoogleAuthProvider()..setCustomParameters({'prompt': 'select_account'}));
