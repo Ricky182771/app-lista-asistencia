@@ -33,8 +33,6 @@ bool esEditable(String fecha, DateTime hoy) {
   return dias >= 0 && dias <= diasEditables;
 }
 
-String claseId(String profesorUid, String grupoId) => '${profesorUid}_$grupoId';
-
 String paseId(String claseId, String fecha) => '${claseId}_$fecha';
 
 bool _activo(Map<dynamic, dynamic> alumno) => alumno['activo'] != false;

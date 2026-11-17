@@ -50,23 +50,26 @@ admin se crea a mano en la consola de Firebase.
 usuarios/{uid}               nombre, email, fotoUrl, rol
 invitaciones/{email}         rol, creadoPor                  // ID = correo en minúsculas
 grupos/{grupoId}             nombre, profesores: [uid], alumnos: [{num, nombre, activo}]
-clases/{profesorUid}_{grupoId}
-                             profesorUid, grupoId, materia (solo etiqueta), salon (el de siempre)
+clases/{id generado}         profesorUid, grupoId, materia, salon (el de siempre)
 pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el real de ese día),
                              fecha "AAAA-MM-DD", marcadoEn, enviadoEn, editadoEn,
                              estados: { "<N.L>": 0 | 1 | 2 }
 ```
 
 - **Estados de asistencia:** `0` presente, `1` falta, `2` falta justificada (sin motivo, solo la marca).
-- **Una clase = profesor + grupo.** La materia es solo una etiqueta y el salón puede cambiar, así que
-  ninguno de los dos forma parte del ID.
+- **Una clase = profesor + grupo + materia.** Un profe puede dar varias materias al mismo grupo; lo que no
+  se repite es el mismo profe con la misma materia en un grupo (`materiaRepetida`, sin distinguir
+  mayúsculas ni acentos). El ID lo genera Firestore en el cliente (`collection('clases').doc()`) al dar de
+  alta, así la materia y el salón se corrigen con un `update()` sin cambiar el ID del que dependen los
+  pases. Hay clases viejas con ID `{profesorUid}_{grupoId}`: siguen sirviendo porque todo usa `doc.id`.
 - **Un pase por clase por día.** Una materia que dura dos módulos seguidos es un solo pase.
 - `grupos.profesores` lo mantiene el admin en el mismo `WriteBatch` con el que crea o borra una clase;
-  las reglas lo usan para que un profe solo lea sus grupos.
+  las reglas lo usan para que un profe solo lea sus grupos. Al borrar una clase, el profe solo sale de
+  `profesores` si ya no le queda otra clase con ese grupo (`quitarProfeDelGrupo`).
 - **Quitar acceso** = borrar `usuarios/{uid}` + `invitaciones/{correo}` en el mismo `WriteBatch`. Si
   solo se borra el usuario, la invitación sigue y la persona se da de alta sola al volver a entrar.
-- Los IDs de `clases` y `pases` son **determinísticos** para que un reintento sin internet no duplique
-  documentos.
+- Los IDs de `pases` son **determinísticos** para que un reintento sin internet no duplique documentos.
+  Los de `clases` ya no: se generan una sola vez en el cliente, y un reintento reusa ese mismo ID.
 - Editar un pase es un `update()` que solo toca `estados` y `editadoEn`
   (`{'estados.3': 2, 'editadoEn': FieldValue.serverTimestamp()}`). Las reglas solo dejan cambiar `estados`,
   `enviadoEn` y `editadoEn`; el salón y `marcadoEn` se fijan al crear el pase. Así, un pase del mismo día
