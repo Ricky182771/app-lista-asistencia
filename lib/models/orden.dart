@@ -55,3 +55,8 @@ Resumen resumenDelGrupo(Set<String> claseIds, List<Map<String, dynamic>> pases) 
     faltas: estados.values.where((e) => e == falta).length,
   );
 }
+
+/// Resaltar el grupo para ir a revisarlo: tiene clases y nadie ha pasado lista. Si nadie en toda la
+/// escuela ha pasado lista ese día (fin de semana, día festivo), no se resalta ninguno.
+bool revisarGrupo(Resumen r, {required bool hayPasesEnLaEscuela}) =>
+    hayPasesEnLaEscuela && r.manana == null && r.clases > 0;

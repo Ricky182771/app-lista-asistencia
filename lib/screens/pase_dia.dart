@@ -69,9 +69,17 @@ class _PaseDiaState extends State<PaseDia> {
     });
   }
 
+  /// Estados con los que se comparan los cambios: los del pase, o todos presentes si es nuevo.
+  Map<String, dynamic> _guardados(Map<String, dynamic>? pase) => pase == null
+      ? estadosIniciales((widget.grupo.data()?['alumnos'] as List?) ?? const [])
+      : Map<String, dynamic>.from(pase['estados'] as Map? ?? const {});
+
+  /// Lo mismo que habilita "Guardar cambios": tocar un alumno y regresarlo a como estaba no cuenta.
+  bool get _hayCambios => camposEditados(_guardados(_snap?.docs.firstOrNull?.data()), _cambios).isNotEmpty;
+
   /// `true` si no hay cambios sin guardar o el profe decide descartarlos.
   Future<bool> _descartarCambios() async {
-    if (_cambios.isEmpty) return true;
+    if (!_hayCambios) return true;
     final descartar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -107,7 +115,7 @@ class _PaseDiaState extends State<PaseDia> {
   Widget build(BuildContext context) {
     final snap = _snap;
     return PopScope(
-      canPop: _cambios.isEmpty,
+      canPop: !_hayCambios,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop || !await _descartarCambios() || !context.mounted) return;
         Navigator.pop(context);
@@ -140,9 +148,7 @@ class _PaseDiaState extends State<PaseDia> {
     final alumnos = (widget.grupo.data()?['alumnos'] as List?) ?? const [];
     final doc = snap.docs.firstOrNull;
     final pase = doc?.data();
-    final guardados = pase == null
-        ? estadosIniciales(alumnos)
-        : Map<String, dynamic>.from(pase['estados'] as Map? ?? const {});
+    final guardados = _guardados(pase);
     final editable = esEditable(_fecha, DateTime.now());
     final filas = filasDelPase(alumnos, guardados);
     final campos = pase == null ? const <String, int>{} : camposEditados(guardados, _cambios);

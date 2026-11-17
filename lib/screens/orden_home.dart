@@ -118,8 +118,11 @@ class _OrdenHomeState extends State<OrdenHome> {
               )
             else if (d.grupos!.docs.isEmpty)
               const ListTile(title: Text('Aún no hay grupos.'))
-            else
+            else ...[
+              if (d.pases!.docs.isEmpty)
+                const ListTile(leading: Icon(Icons.event_busy), title: Text('Nadie ha pasado lista este día')),
               for (final g in [...d.grupos!.docs]..sort((a, b) => _nombre(a).compareTo(_nombre(b)))) _tile(context, g),
+            ],
           ],
         );
       },
@@ -132,8 +135,7 @@ class _OrdenHomeState extends State<OrdenHome> {
         if (c.data()['grupoId'] == g.id) c.id,
     };
     final r = resumenDelGrupo(claseIds, _datos.pasesDe(g.id));
-    // Los que el encargado tiene que ir a revisar: tienen clases y nadie ha pasado lista.
-    final revisar = r.manana == null && r.clases > 0;
+    final revisar = revisarGrupo(r, hayPasesEnLaEscuela: _datos.pases!.docs.isNotEmpty);
     final colores = Theme.of(context).colorScheme;
     final estado = r.manana == null ? 'Sin pase de la mañana' : 'Faltas sin justificar: ${r.faltas}';
     final fecha = _fecha;
