@@ -83,6 +83,9 @@ class _PaseMensualState extends State<PaseMensual> {
   bool _exportando = false;
   bool _sobreBorde = false;
 
+  /// Al empezar a arrastrar el borde: ancho de la columna y posición del puntero.
+  ({double ancho, double x})? _arrastre;
+
   @override
   void initState() {
     super.initState();
@@ -321,13 +324,20 @@ class _PaseMensualState extends State<PaseMensual> {
         onExit: (_) => setState(() => _sobreBorde = false),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: (_) => setState(() => _sobreBorde = true),
-          onHorizontalDragUpdate: (d) =>
-              setState(() => _anchoNombreElegido = anchoNombre(ancho + d.delta.dx, pantalla)),
-          onHorizontalDragEnd: (_) {
-            _guardarAnchoNombre(_anchoNombreElegido);
-            setState(() => _sobreBorde = false);
+          // Se mide contra el inicio del arrastre y no con `delta`: entre dos cuadros llegan varios
+          // movimientos y, sumados al ancho del último build, solo contaba el último (se sentía pesado).
+          // Así el borde va pegado al puntero, aunque se pase del límite y regrese.
+          onHorizontalDragStart: (d) => setState(() {
+            _sobreBorde = true;
+            _arrastre = (ancho: ancho, x: d.globalPosition.dx);
+          }),
+          onHorizontalDragUpdate: (d) {
+            final inicio = _arrastre;
+            if (inicio == null) return;
+            setState(() => _anchoNombreElegido = anchoNombre(inicio.ancho + d.globalPosition.dx - inicio.x, pantalla));
           },
+          onHorizontalDragEnd: (_) => _terminarArrastre(),
+          onHorizontalDragCancel: _terminarArrastre,
           onDoubleTap: () => setState(() => _guardarAnchoNombre(null)),
           // Área de 16 px para atinarle con el dedo; la línea visible es delgada.
           child: SizedBox(
@@ -344,6 +354,13 @@ class _PaseMensualState extends State<PaseMensual> {
         ),
       ),
     );
+  }
+
+  void _terminarArrastre() {
+    if (_arrastre == null) return;
+    _arrastre = null;
+    _guardarAnchoNombre(_anchoNombreElegido);
+    setState(() => _sobreBorde = false);
   }
 
   Widget _cabecera(String fecha, DocumentSnapshot<Object?> pase, DateTime hoy, TextStyle? estilo) {
