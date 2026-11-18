@@ -37,8 +37,8 @@ Para correr la web en otro puerto no uses el 8080: es del emulador de Firestore.
 | Rol | Valor en `rol` | Qué hace |
 | --- | --- | --- |
 | Profesor | `profesor` | Pasa lista de sus clases y edita pases de los últimos 28 días |
-| Encargado de orden | `orden` | Ve ausentes por grupo y copia un mensaje para el grupo de padres. Solo lee |
-| Administrativo | `admin` | Sube listas en CSV, da de alta clases e invita usuarios |
+| Encargado de orden | `orden` | Ve ausentes por grupo y copia un mensaje para el grupo de padres; consulta la vista mensual de cualquier clase y la exporta. Solo lee |
+| Administrativo | `admin` | Sube listas en CSV, da de alta clases e invita usuarios; consulta la vista mensual de cualquier clase y la exporta (sin editar pases) |
 
 Los alumnos no usan la app. Entra solo quien tiene invitación: el admin crea `invitaciones/{correo}` y,
 en el primer inicio de sesión, la app crea `usuarios/{uid}` con el rol de la invitación. El primer
@@ -97,8 +97,13 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
 - **Vista mensual del profe:** una columna por cada día que tiene pase (no se guarda horario), cabecera
   con la fecha `AAAA-MM-DD`. Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
   Las columnas de hace más de 28 días son de solo lectura.
-- **Exportar registro** (botón de descarga en la vista mensual): lee todos los pases de la clase con una
-  sola consulta (`pasesDeLaClase`), el profe elige meses y formato, y se guarda con
+- **Vista mensual para admin y orden:** `PaseMensual(soloLectura: true)` vía `abrirConsultaMensual`. Admin
+  la abre desde cada clase en la pantalla del grupo; orden, desde el detalle del grupo (ícono de calendario,
+  elige la clase si hay varias). No se edita nada y las consultas van **sin** `profesorUid`
+  (`pasesDelMes(null, …)`), lo que usa el índice `claseId + fecha` de `firestore.indexes.json`: hay que
+  desplegarlo (`firebase deploy --only firestore:indexes`) o Firestore rechaza la consulta.
+- **Exportar registro** (botón de descarga en la vista mensual, para los tres roles): lee todos los pases
+  de la clase con una sola consulta (`pasesDeLaClase`), se eligen meses y formato, y se guarda con
   `FilePicker.saveFile` (en web se descarga; en Android abre "Guardar como"). **.xlsx**: una hoja por mes
   con P/F/J en los colores de la app, totales con `COUNTIF` (con el resultado ya guardado), % de
   asistencia y faltas por día; con varios meses, una hoja "Resumen" al principio. **.csv**: una sola

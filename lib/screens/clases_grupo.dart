@@ -7,13 +7,19 @@ import '../models/clase.dart';
 import '../models/grupo.dart';
 import '../services/clases.dart';
 import 'inicio.dart';
+import 'pase_mensual.dart';
 
 /// Las clases de un grupo, con su profe y materia, y el alta, la edición y el borrado de clases.
 /// Va dentro de la pantalla del grupo, así que el grupo de la clase es el que está abierto.
+/// Cada clase abre también su vista mensual en solo consulta.
 class ClasesDelGrupo extends StatefulWidget {
-  const ClasesDelGrupo({super.key, required this.grupoId, required this.nombreGrupo});
-  final String grupoId;
+  const ClasesDelGrupo({super.key, required this.grupo, required this.nombreGrupo});
+
+  /// El grupo abierto; la vista mensual toma de aquí la lista de alumnos.
+  final DocumentSnapshot<Map<String, dynamic>> grupo;
   final String nombreGrupo;
+
+  String get grupoId => grupo.id;
 
   @override
   State<ClasesDelGrupo> createState() => _ClasesDelGrupoState();
@@ -144,6 +150,16 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      tooltip: 'Vista mensual',
+                      icon: const Icon(Icons.calendar_view_month),
+                      onPressed: () => abrirConsultaMensual(
+                        context,
+                        claseId: c.id,
+                        grupo: widget.grupo,
+                        titulo: '${widget.nombreGrupo} · ${c.materia}',
+                      ),
+                    ),
                     IconButton(
                       tooltip: 'Editar clase',
                       icon: const Icon(Icons.edit_outlined),

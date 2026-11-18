@@ -17,26 +17,54 @@ import 'inicio.dart';
 const _alto = 48.0;
 const _anchoDia = 96.0;
 
+/// Admin y orden: la vista mensual en solo consulta (con exportar). [mes] por omisión, el actual.
+void abrirConsultaMensual(
+  BuildContext context, {
+  required String claseId,
+  required DocumentSnapshot<Map<String, dynamic>> grupo,
+  required String titulo,
+  DateTime? mes,
+}) {
+  Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => PaseMensual(
+        claseId: claseId,
+        grupo: grupo,
+        titulo: titulo,
+        mes: mes ?? DateTime.now(),
+        soloLectura: true,
+      ),
+    ),
+  );
+}
+
 /// Vista mensual de una clase: una columna por cada día con pase. N.L y Nombre quedan fijos y las
-/// fechas se desplazan en horizontal.
+/// fechas se desplazan en horizontal. También exporta el registro a .xlsx o .csv.
 class PaseMensual extends StatefulWidget {
   const PaseMensual({
     super.key,
-    required this.clase,
+    required this.claseId,
     required this.grupo,
     required this.titulo,
     required this.mes,
+    this.soloLectura = false,
   });
-  final DocumentSnapshot<Map<String, dynamic>> clase, grupo;
+  final String claseId;
+  final DocumentSnapshot<Map<String, dynamic>> grupo;
   final String titulo;
   final DateTime mes;
+
+  /// Para admin y orden: no se edita nada y las consultas no filtran por profesor (las reglas les
+  /// dejan leer todos los pases). El profe siempre filtra por su uid, como piden las reglas.
+  final bool soloLectura;
 
   @override
   State<PaseMensual> createState() => _PaseMensualState();
 }
 
 class _PaseMensualState extends State<PaseMensual> {
-  final _uid = FirebaseAuth.instance.currentUser!.uid;
+  late final String? _profesor = widget.soloLectura ? null : FirebaseAuth.instance.currentUser!.uid;
   late DateTime _mes = DateTime(widget.mes.year, widget.mes.month);
   QuerySnapshot<Map<String, dynamic>>? _snap;
   Object? _error;
@@ -59,7 +87,7 @@ class _PaseMensualState extends State<PaseMensual> {
     _sub?.cancel();
     _snap = null;
     _error = null;
-    _sub = pasesDelMes(_uid, widget.clase.id, rangoDelMes(_mes.year, _mes.month)).listen(
+    _sub = pasesDelMes(_profesor, widget.claseId, rangoDelMes(_mes.year, _mes.month)).listen(
       (s) => setState(() => _snap = s),
       onError: (Object e) => setState(() => _error = e),
     );
@@ -84,7 +112,7 @@ class _PaseMensualState extends State<PaseMensual> {
     void avisar(String m) => avisos.showSnackBar(SnackBar(content: Text(m)));
     setState(() => _exportando = true);
     try {
-      final snap = await pasesDeLaClase(_uid, widget.clase.id);
+      final snap = await pasesDeLaClase(_profesor, widget.claseId);
       final pases = {
         for (final d in snap.docs)
           '${d.data()['fecha']}': Map<String, dynamic>.from(d.data()['estados'] as Map? ?? const {}),
@@ -170,20 +198,20 @@ class _PaseMensualState extends State<PaseMensual> {
               ),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Wrap(
               spacing: 16,
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                LeyendaEstados(),
+                const LeyendaEstados(),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock_outline, size: 18),
-                    SizedBox(width: 6),
-                    Text('Más de $diasEditables días: solo lectura'),
+                    Icon(widget.soloLectura ? Icons.visibility_outlined : Icons.lock_outline, size: 18),
+                    const SizedBox(width: 6),
+                    Text(widget.soloLectura ? 'Solo consulta' : 'Más de $diasEditables días: solo lectura'),
                   ],
                 ),
               ],
@@ -267,7 +295,8 @@ class _PaseMensualState extends State<PaseMensual> {
   }
 
   Widget _cabecera(String fecha, DocumentSnapshot<Object?> pase, DateTime hoy, TextStyle? estilo) {
-    final editable = esEditable(fecha, hoy);
+    // En solo consulta no se marca ningún candado: no se edita ninguna columna.
+    final editable = widget.soloLectura || esEditable(fecha, hoy);
     return SizedBox(
       width: _anchoDia,
       height: _alto,
@@ -296,13 +325,15 @@ class _PaseMensualState extends State<PaseMensual> {
       width: _anchoDia,
       height: _alto,
       child: Center(
-        child: editable
-            ? InkWell(
-                borderRadius: BorderRadius.circular(6),
-                onTap: () => _tocar(paseId, fecha, nl, actual),
-                child: celda,
-              )
-            : Opacity(opacity: 0.4, child: celda),
+        child: widget.soloLectura
+            ? celda
+            : editable
+                ? InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => _tocar(paseId, fecha, nl, actual),
+                    child: celda,
+                  )
+                : Opacity(opacity: 0.4, child: celda),
       ),
     );
   }

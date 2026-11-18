@@ -102,7 +102,7 @@ class _PaseDiaState extends State<PaseDia> {
       context,
       MaterialPageRoute<void>(
         builder: (_) => PaseMensual(
-          clase: widget.clase,
+          claseId: widget.clase.id,
           grupo: widget.grupo,
           titulo: widget.titulo,
           mes: DateTime.parse(_fecha),

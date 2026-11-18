@@ -200,6 +200,18 @@ describe('pases', () => {
   const crear = (f) =>
     setDoc(doc(como('profe'), `pases/profe_g1_${f}`), pase('profe_g1', 'g1', 'profe', f));
 
+  // Vista mensual y exportar: admin y orden consultan por clase sin filtrar por profe; el profe no puede.
+  test('admin y orden consultan los pases de una clase solo por claseId', async () => {
+    const porClase = (db, ...filtros) =>
+      getDocs(query(collection(db, 'pases'), where('claseId', '==', 'profe_g1'), ...filtros));
+    const delMes = [where('fecha', '>=', fecha(-40)), where('fecha', '<', fecha(1))];
+    await assertSucceeds(porClase(como('admin'), ...delMes));
+    await assertSucceeds(porClase(como('orden'), ...delMes));
+    await assertSucceeds(porClase(como('orden')));
+    await assertFails(porClase(como('profe'), ...delMes));
+    await assertSucceeds(porClase(como('profe'), where('profesorUid', '==', 'profe'), ...delMes));
+  });
+
   test('el profe crea un pase de hoy y uno de hace 27 días', async () => {
     await assertSucceeds(crear(fecha(0)));
     await assertSucceeds(crear(fecha(-27)));
