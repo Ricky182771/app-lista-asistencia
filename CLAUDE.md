@@ -153,6 +153,10 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   `firebase deploy --only firestore:rules`). `deploy` sube el `firestore.rules` de la carpeta actual: desde
   una rama creada antes de un cambio de reglas se despliegan las reglas viejas y se deshace ese cambio en
   producción sin aviso. Si una rama de app queda atrás de un PR de reglas, actualízala con `git merge origin/main`.
+- **Versión vieja en web después de desplegar:** Firebase Hosting manda `max-age=3600` por omisión y los
+  archivos de Flutter web (`main.dart.js`, `flutter_bootstrap.js`) no llevan hash en el nombre, así que el
+  navegador seguía usando el build anterior hasta una hora. `firebase.json` manda `Cache-Control: no-cache`
+  para todo: el navegador revalida en cada carga (con ETag; si no cambió, la respuesta es un 304 vacío).
 - Si `flutter create` se vuelve a correr, revisa que `.metadata` siga listando `android` **y** `web`.
 - **`firebase` instalado como binario standalone** (`curl -sL firebase.tools | bash`): dentro de
   `emulators:exec` usa su propio `npm`, que falla con `/bin/sh: --: opción inválida`. Instala la CLI con
