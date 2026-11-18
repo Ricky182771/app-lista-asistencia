@@ -60,17 +60,18 @@ class Registro {
   Registro({
     required this.titulo,
     required Map<String, Map<String, dynamic>> pases,
-    required List<dynamic> alumnos,
+    required this.alumnos,
     required Set<String> meses,
-  })  : _alumnos = alumnos,
-        _estados = {
+  }) : _estados = {
           for (final f in columnasDelMes(pases.keys.where(_formatoFecha.hasMatch)))
             if (meses.contains(_mes(f))) f: pases[f]!,
         };
 
   /// "Grupo · Materia", como en la app.
   final String titulo;
-  final List<dynamic> _alumnos;
+
+  /// `grupos.alumnos`: `[{num, nombre, activo}]`.
+  final List<dynamic> alumnos;
 
   /// Fecha → estados, en orden de fecha.
   final Map<String, Map<String, dynamic>> _estados;
@@ -80,7 +81,7 @@ class Registro {
   List<String> fechasDe(String mes) => [for (final f in _estados.keys) if (_mes(f) == mes) f];
 
   /// Igual que la vista mensual: activos más quien tenga registro en esas fechas aunque esté de baja.
-  List<Fila> filas(List<String> fechas) => filasDelPase(_alumnos, {for (final f in fechas) ...?_estados[f]});
+  List<Fila> filas(List<String> fechas) => filasDelPase(alumnos, {for (final f in fechas) ...?_estados[f]});
 
   /// `null` si no hay registro o el valor no es un estado conocido.
   int? estado(String fecha, String nl) {
