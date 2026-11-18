@@ -36,6 +36,15 @@ Stream<QuerySnapshot<Map<String, dynamic>>> pasesDelMes(
         .where('fecha', isLessThan: rango.hasta)
         .snapshots(includeMetadataChanges: true);
 
+/// Todos los pases de una clase, para exportar. Una sola lectura con el mismo índice que [pasesDelMes];
+/// sin internet, Firestore responde con lo que tenga en caché.
+Future<QuerySnapshot<Map<String, dynamic>>> pasesDeLaClase(String uid, String claseId) => _db
+    .collection('pases')
+    .where('profesorUid', isEqualTo: uid)
+    .where('claseId', isEqualTo: claseId)
+    .orderBy('fecha')
+    .get();
+
 // Orden (y admin) leen grupos, clases y pases sin depender del documento, así que pueden consultar
 // colecciones completas.
 

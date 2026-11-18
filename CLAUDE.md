@@ -97,6 +97,13 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
 - **Vista mensual del profe:** una columna por cada día que tiene pase (no se guarda horario), cabecera
   con la fecha `AAAA-MM-DD`. Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
   Las columnas de hace más de 28 días son de solo lectura.
+- **Exportar registro** (botón de descarga en la vista mensual): lee todos los pases de la clase con una
+  sola consulta (`pasesDeLaClase`), el profe elige meses y formato, y se guarda con
+  `FilePicker.saveFile` (en web se descarga; en Android abre "Guardar como"). **.xlsx**: una hoja por mes
+  con P/F/J en los colores de la app, totales con `COUNTIF` (con el resultado ya guardado), % de
+  asistencia y faltas por día; con varios meses, una hoja "Resumen" al principio. **.csv**: una sola
+  tabla plana, UTF-8 con BOM, comas y CRLF. % asistencia = P / (P + F + J). El .xlsx lo arma
+  `lib/models/xlsx.dart` sin paquetes (ZIP sin compresión); no agregues uno para esto.
 - **Mensaje para padres:** uno por grupo al día, a partir del **pase de la mañana** (el primero del día
   según `marcadoEn`). Lista solo nombres con falta sin justificar (`1`), sin materia. La app no se
   conecta a WhatsApp: genera el texto y lo copia al portapapeles.
