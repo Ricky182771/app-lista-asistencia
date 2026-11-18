@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
@@ -10,11 +9,23 @@ import 'package:flutter/material.dart';
 import '../models/exportar.dart';
 import '../models/pase.dart';
 import '../models/xlsx.dart';
+import '../services/almacen_local.dart' if (dart.library.js_interop) '../services/almacen_local_web.dart';
 import '../services/pases.dart';
 import 'celda_estado.dart';
 import 'inicio.dart';
 
 const _alto = 48.0;
+
+/// Ancho de la columna Nombre que eligió el usuario arrastrando su borde. En web se guarda en
+/// `localStorage` (por navegador, no por cuenta: es solo una preferencia visual, sin datos personales);
+/// en Android dura mientras la app esté abierta. `null` = automático.
+const _claveAnchoNombre = 'paselista.anchoNombre';
+double? _anchoNombreElegido = double.tryParse(leerLocal(_claveAnchoNombre) ?? '');
+
+void _guardarAnchoNombre(double? ancho) {
+  _anchoNombreElegido = ancho;
+  guardarLocal(_claveAnchoNombre, ancho == null ? '' : ancho.round().toString());
+}
 const _anchoDia = 96.0;
 
 /// Admin y orden: la vista mensual en solo consulta (con exportar). [mes] por omisión, el actual.
@@ -70,6 +81,7 @@ class _PaseMensualState extends State<PaseMensual> {
   Object? _error;
   StreamSubscription<void>? _sub;
   bool _exportando = false;
+  bool _sobreBorde = false;
 
   @override
   void initState() {
@@ -241,7 +253,8 @@ class _PaseMensualState extends State<PaseMensual> {
     final alumnos = (widget.grupo.data()?['alumnos'] as List?) ?? const [];
     // Activos más quien tenga registros este mes aunque esté dado de baja.
     final filas = filasDelPase(alumnos, {for (final e in estadosDe.values) ...e});
-    final anchoFijo = min(240.0, MediaQuery.sizeOf(context).width * 0.45);
+    final pantalla = MediaQuery.sizeOf(context).width;
+    final anchoFijo = anchoNombre(_anchoNombreElegido, pantalla);
     final cabecera = Theme.of(context).textTheme.labelMedium;
 
     Widget celdaFija(Widget child) => SizedBox(height: _alto, child: Align(alignment: Alignment.centerLeft, child: child));
@@ -272,6 +285,7 @@ class _PaseMensualState extends State<PaseMensual> {
                 ],
               ),
             ),
+            _borde(alto: _alto * (filas.length + 1), ancho: anchoFijo, pantalla: pantalla),
             Expanded(
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -291,6 +305,44 @@ class _PaseMensualState extends State<PaseMensual> {
           ],
         ),
       ],
+    );
+  }
+
+  /// Borde derecho de la columna Nombre: se arrastra para cambiar el ancho y con doble clic (o doble
+  /// toque) vuelve al automático. El ancho elegido se guarda al soltar.
+  Widget _borde({required double alto, required double ancho, required double pantalla}) {
+    final colores = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: 'Arrastra para cambiar el ancho · doble clic para restablecer',
+      waitDuration: const Duration(milliseconds: 600),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        onEnter: (_) => setState(() => _sobreBorde = true),
+        onExit: (_) => setState(() => _sobreBorde = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: (_) => setState(() => _sobreBorde = true),
+          onHorizontalDragUpdate: (d) =>
+              setState(() => _anchoNombreElegido = anchoNombre(ancho + d.delta.dx, pantalla)),
+          onHorizontalDragEnd: (_) {
+            _guardarAnchoNombre(_anchoNombreElegido);
+            setState(() => _sobreBorde = false);
+          },
+          onDoubleTap: () => setState(() => _guardarAnchoNombre(null)),
+          // Área de 16 px para atinarle con el dedo; la línea visible es delgada.
+          child: SizedBox(
+            width: 16,
+            height: alto,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                width: _sobreBorde ? 3 : 1,
+                color: _sobreBorde ? colores.primary : colores.outlineVariant,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

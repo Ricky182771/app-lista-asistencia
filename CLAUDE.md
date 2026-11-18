@@ -96,7 +96,10 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   carga siguiente, cuando `configurarWeb()` los borra (porque ese profe entró con la casilla marcada).
 - **Vista mensual del profe:** una columna por cada día que tiene pase (no se guarda horario), cabecera
   con la fecha `AAAA-MM-DD`. Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
-  Las columnas de hace más de 28 días son de solo lectura.
+  Las columnas de hace más de 28 días son de solo lectura. La columna Nombre se ensancha arrastrando su
+  borde (doble clic la regresa al ancho automático; `anchoNombre()` la limita al 75 % de la pantalla). En
+  web el ancho se guarda en `localStorage` (`paselista.anchoNombre`); en Android dura mientras la app esté
+  abierta.
 - **Vista mensual para admin y orden:** `PaseMensual(soloLectura: true)` vía `abrirConsultaMensual`. Admin
   la abre desde cada clase en la pantalla del grupo; orden, desde el detalle del grupo (ícono de calendario,
   elige la clase si hay varias). No se edita nada y las consultas van **sin** `profesorUid`

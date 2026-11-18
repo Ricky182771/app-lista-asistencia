@@ -100,4 +100,14 @@ void main() {
         ['2026-11-02', '2026-11-10', '2026-11-13']);
     expect(columnasDelMes(const []), isEmpty);
   });
+
+  test('anchoNombre: automático, elegido y límites', () {
+    expect(anchoNombre(null, 1920), 240);
+    expect(anchoNombre(null, 400), 180);
+    expect(anchoNombre(null, 200), anchoNombreMin);
+    expect(anchoNombre(500, 1920), 500);
+    expect(anchoNombre(2000, 1920), 1440); // 75 % de la pantalla
+    expect(anchoNombre(50, 1920), anchoNombreMin);
+    expect(anchoNombre(300, 100), anchoNombreMin); // ventana más chica que el mínimo
+  });
 }

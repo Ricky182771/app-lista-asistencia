@@ -1,5 +1,7 @@
 // Lógica pura del pase de lista: sin Firebase, para poder probarla con `flutter test`.
 
+import 'dart:math';
+
 import 'package:intl/intl.dart';
 
 /// Estados de asistencia tal como se guardan en `pases.estados`. No hay otros valores.
@@ -78,3 +80,14 @@ Map<String, int> camposEditados(Map<String, dynamic> estados, Map<String, int> c
 
 /// Columnas de la vista mensual: un día por cada pase, sin repetir y en orden ("AAAA-MM-DD" ordena como texto).
 List<String> columnasDelMes(Iterable<String> fechas) => {...fechas}.toList()..sort();
+
+/// Ancho mínimo de la columna fija (N.L y Nombre) de la vista mensual.
+const anchoNombreMin = 120.0;
+
+/// Ancho de la columna fija de la vista mensual. Sin ancho [elegido] (el que arrastró el usuario):
+/// 240 o el 45 % de la pantalla, lo que sea menor. Siempre entre [anchoNombreMin] y el 75 % de la
+/// pantalla, para que queden a la vista algunas fechas aunque la ventana se haga chica.
+double anchoNombre(double? elegido, double pantalla) {
+  final maximo = max(anchoNombreMin, pantalla * 0.75);
+  return (elegido ?? min(240.0, pantalla * 0.45)).clamp(anchoNombreMin, maximo).toDouble();
+}
