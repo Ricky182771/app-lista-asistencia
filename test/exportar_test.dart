@@ -84,13 +84,14 @@ void main() {
   test('csvRegistro: BOM, comillas, sin fórmulas y totales', () {
     expect(
       csvRegistro(_registro({'2026-10', '2026-11'})),
-      '﻿N.L,Nombre,Estatus,2026-10-30,2026-11-03,2026-11-04,Asistencias,Faltas,Faltas justificadas,'
+      '\uFEFFN.L,Nombre,Estatus,2026-10-30,2026-11-03,2026-11-04,Asistencias,Faltas,Faltas justificadas,'
       '% asistencia\r\n'
       '1,Ana Pérez,Activo,P,F,P,2,1,0,66.7\r\n'
       '2,"Beto, el Grande",Activo,F,J,P,1,1,1,33.3\r\n'
       "3,'=Cero,Baja,,P,,1,0,0,100.0\r\n",
     );
-    expect(utf8.decode(csvRegistroBytes(_registro({'2026-11'}))), startsWith('﻿N.L,'));
+    // utf8.decode se come el BOM, así que se revisan los bytes: EF BB BF y luego "N.L,".
+    expect(csvRegistroBytes(_registro({'2026-11'})).take(7), [0xEF, 0xBB, 0xBF, ...ascii.encode('N.L,')]);
   });
 
   group('xlsxRegistro', () {

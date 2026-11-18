@@ -150,7 +150,7 @@ String csvRegistro(Registro r) {
       pct == null ? '' : (pct * 100).toStringAsFixed(1),
     ]);
   }
-  return '﻿${lineas.map((l) => l.map(_campoCsv).join(',')).join('\r\n')}\r\n';
+  return '\uFEFF${lineas.map((l) => l.map(_campoCsv).join(',')).join('\r\n')}\r\n';
 }
 
 Uint8List csvRegistroBytes(Registro r) => Uint8List.fromList(utf8.encode(csvRegistro(r)));
