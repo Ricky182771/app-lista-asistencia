@@ -8,6 +8,7 @@ import '../models/orden.dart';
 import '../models/pase.dart';
 import '../services/pases.dart';
 import 'inicio.dart';
+import 'pase_mensual.dart';
 
 typedef _Snap = QuerySnapshot<Map<String, dynamic>>;
 
@@ -202,7 +203,16 @@ class _GrupoDetalle extends StatelessWidget {
         final titulo = Theme.of(context).textTheme.titleMedium;
 
         return Scaffold(
-          appBar: AppBar(title: Text('Grupo $nombre · $fecha')),
+          appBar: AppBar(
+            title: Text('Grupo $nombre · $fecha'),
+            actions: [
+              IconButton(
+                tooltip: 'Vista mensual',
+                icon: const Icon(Icons.calendar_view_month),
+                onPressed: grupo == null ? null : () => _vistaMensual(context, grupo, nombre),
+              ),
+            ],
+          ),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -240,6 +250,52 @@ class _GrupoDetalle extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  /// Elige la clase del grupo (directo si solo hay una) y abre su vista mensual en el mes de [fecha].
+  Future<void> _vistaMensual(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> grupo,
+    String nombre,
+  ) async {
+    String materia(QueryDocumentSnapshot<Map<String, dynamic>> c) => '${c.data()['materia'] ?? ''}';
+    final clases = [
+      for (final c in [...?datos.clases?.docs])
+        if (c.data()['grupoId'] == grupoId) c,
+    ]..sort((a, b) => materia(a).toLowerCase().compareTo(materia(b).toLowerCase()));
+    if (clases.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este grupo todavía no tiene clases.')),
+      );
+      return;
+    }
+    final elegida = clases.length == 1
+        ? clases.single
+        : await showDialog<QueryDocumentSnapshot<Map<String, dynamic>>>(
+            context: context,
+            builder: (context) => SimpleDialog(
+              title: const Text('Vista mensual de…'),
+              children: [
+                for (final c in clases)
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.pop(context, c),
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(materia(c)),
+                      subtitle: Text('Salón ${c.data()['salon'] ?? ''}'),
+                    ),
+                  ),
+              ],
+            ),
+          );
+    if (elegida == null || !context.mounted) return;
+    abrirConsultaMensual(
+      context,
+      claseId: elegida.id,
+      grupo: grupo,
+      titulo: '$nombre · ${materia(elegida)}',
+      mes: DateTime.parse(fecha),
     );
   }
 

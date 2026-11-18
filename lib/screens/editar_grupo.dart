@@ -118,7 +118,7 @@ class _EditarGrupoState extends State<EditarGrupo> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
-        ClasesDelGrupo(grupoId: widget.grupoId, nombreGrupo: _nombre),
+        ClasesDelGrupo(grupo: doc, nombreGrupo: _nombre),
         const SizedBox(height: 16),
         Text('Alumnos', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),

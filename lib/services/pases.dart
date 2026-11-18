@@ -22,19 +22,29 @@ Stream<QuerySnapshot<Map<String, dynamic>>> paseDelDia(String uid, String claseI
         .where('fecha', isEqualTo: fecha)
         .snapshots(includeMetadataChanges: true);
 
-/// Pases de una clase en el mes: `fecha` en [desde, hasta). Usa el índice de firestore.indexes.json.
+/// Pases de una clase. [uid] = el profe: sus consultas deben filtrar por `profesorUid` como las
+/// reglas. Admin y orden pasan `null`: las reglas los dejan leer todos los pases.
+Query<Map<String, dynamic>> _pasesDeLaClase(String? uid, String claseId) {
+  final q = _db.collection('pases').where('claseId', isEqualTo: claseId);
+  return uid == null ? q : q.where('profesorUid', isEqualTo: uid);
+}
+
+/// Pases de una clase en el mes: `fecha` en [desde, hasta). Usa los índices de firestore.indexes.json
+/// (con [uid]: profesorUid + claseId + fecha; sin él: claseId + fecha).
 Stream<QuerySnapshot<Map<String, dynamic>>> pasesDelMes(
-  String uid,
+  String? uid,
   String claseId,
   ({String desde, String hasta}) rango,
 ) =>
-    _db
-        .collection('pases')
-        .where('profesorUid', isEqualTo: uid)
-        .where('claseId', isEqualTo: claseId)
+    _pasesDeLaClase(uid, claseId)
         .where('fecha', isGreaterThanOrEqualTo: rango.desde)
         .where('fecha', isLessThan: rango.hasta)
         .snapshots(includeMetadataChanges: true);
+
+/// Todos los pases de una clase, para exportar. Una sola lectura con los mismos índices que
+/// [pasesDelMes]; sin internet, Firestore responde con lo que tenga en caché. [uid] como en [pasesDelMes].
+Future<QuerySnapshot<Map<String, dynamic>>> pasesDeLaClase(String? uid, String claseId) =>
+    _pasesDeLaClase(uid, claseId).orderBy('fecha').get();
 
 // Orden (y admin) leen grupos, clases y pases sin depender del documento, así que pueden consultar
 // colecciones completas.
