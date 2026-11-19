@@ -28,3 +28,61 @@ Future<void> guardarAlumnos(String id, List<Alumno> alumnos) =>
     _db.doc('grupos/$id').update({
       'alumnos': [for (final a in alumnos) a.toMap()],
     });
+
+/// Cambia solo el nombre que se muestra. El ID no cambia (de él dependen `clases.grupoId` y
+/// `pases.grupoId`), así que un grupo renombrado conserva el ID de su nombre original.
+/// Sin `await` a propósito (ver [crearGrupo]). Quien llama revisa antes con `errorRenombrar`.
+Future<void> renombrarGrupo(String id, String nombre) =>
+    _db.doc('grupos/$id').update({'nombre': nombre});
+
+/// Lo que se borra junto con el grupo.
+typedef ContenidoGrupo = ({
+  List<DocumentReference<Map<String, dynamic>>> clases,
+  List<DocumentReference<Map<String, dynamic>>> pases,
+});
+
+const _servidor = GetOptions(source: Source.server);
+
+/// Clases y pases del grupo, leídos del **servidor**: sin internet falla (`unavailable`) en vez de
+/// responder con la caché, que podría no tener todos los pases y dejaría huérfanos al borrar.
+Future<ContenidoGrupo> contenidoDelGrupo(String id) async {
+  final clases = await _db.collection('clases').where('grupoId', isEqualTo: id).get(_servidor);
+  final pases = await _db.collection('pases').where('grupoId', isEqualTo: id).get(_servidor);
+  return (
+    clases: [for (final d in clases.docs) d.reference],
+    pases: [for (final d in pases.docs) d.reference],
+  );
+}
+
+/// Borra el grupo, sus clases y todos sus pases. Necesita internet: aquí sí se espera cada lote.
+///
+/// Orden: primero los pases, luego las clases y el grupo al final, en lotes de 400 (el límite de un
+/// `WriteBatch` es 500). Si algo falla a medio camino, el grupo sigue en la lista y se puede volver a
+/// intentar. Al final se repasa: un pase enviado sin internet que llegó mientras se borraba (después
+/// de borrar las clases ya no puede entrar ninguno: las reglas piden que la clase exista).
+/// [progreso] recibe (borrados, total) después de cada lote.
+Future<void> borrarGrupo(
+  String id,
+  ContenidoGrupo contenido, {
+  void Function(int hechos, int total)? progreso,
+}) async {
+  final refs = [...contenido.pases, ...contenido.clases, _db.doc('grupos/$id')];
+  var hechos = 0;
+  for (final lote in enLotes(refs, 400)) {
+    final batch = _db.batch();
+    for (final r in lote) {
+      batch.delete(r);
+    }
+    await batch.commit();
+    hechos += lote.length;
+    progreso?.call(hechos, refs.length);
+  }
+  final rezagados = await _db.collection('pases').where('grupoId', isEqualTo: id).get(_servidor);
+  for (final lote in enLotes(rezagados.docs, 400)) {
+    final batch = _db.batch();
+    for (final d in lote) {
+      batch.delete(d.reference);
+    }
+    await batch.commit();
+  }
+}

@@ -38,7 +38,7 @@ Para correr la web en otro puerto no uses el 8080: es del emulador de Firestore.
 | --- | --- | --- |
 | Profesor | `profesor` | Pasa lista de sus clases y edita pases de los últimos 28 días |
 | Encargado de orden | `orden` | Ve ausentes por grupo y copia un mensaje para el grupo de padres; consulta la vista mensual de cualquier clase y la exporta. Solo lee |
-| Administrativo | `admin` | Sube listas en CSV, da de alta clases e invita usuarios; consulta la vista mensual de cualquier clase y la exporta (sin editar pases) |
+| Administrativo | `admin` | Sube listas en CSV, da de alta clases, renombra o elimina grupos e invita usuarios; consulta la vista mensual de cualquier clase y la exporta (sin editar pases) |
 
 Los alumnos no usan la app. Entra solo quien tiene invitación: el admin crea `invitaciones/{correo}` y,
 en el primer inicio de sesión, la app crea `usuarios/{uid}` con el rol de la invitación. El primer
@@ -66,6 +66,17 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
 - `grupos.profesores` lo mantiene el admin en el mismo `WriteBatch` con el que crea o borra una clase;
   las reglas lo usan para que un profe solo lea sus grupos. Al borrar una clase, el profe solo sale de
   `profesores` si ya no le queda otra clase con ese grupo (`quitarProfeDelGrupo`).
+- **Renombrar grupo** = `update()` solo de `nombre`. El ID (que sale de `idGrupo(nombre)` al importar)
+  **no cambia**, porque de él dependen `clases.grupoId` y `pases.grupoId`: un grupo renombrado conserva el
+  ID de su nombre original. Por eso no se repiten nombres (`errorRenombrar`, `grupoConMismoNombre`, sin
+  distinguir mayúsculas, acentos ni símbolos) y el importador revisa nombres **y** IDs.
+- **Eliminar grupo** (`borrarGrupo`, menú ⋮ en la lista de grupos y en la pantalla del grupo) borra en
+  cascada sus pases, sus clases y el grupo, en lotes de 400 (límite de `WriteBatch`: 500). Es lo único que
+  **sí** espera con `await` y **pide internet**: clases y pases se leen con `Source.server`, porque la
+  caché podría no tener todos los pases y quedarían huérfanos. El grupo va en el último lote: si algo
+  falla a medio camino, sigue en la lista y se reintenta. Después de borrar las clases ya no entra ningún
+  pase atrasado (las reglas piden que la clase exista), y un repaso final borra los que llegaron mientras
+  tanto. Se confirma escribiendo el nombre del grupo (`confirmaNombre`). No se puede deshacer.
 - **Quitar acceso** = borrar `usuarios/{uid}` + `invitaciones/{correo}` en el mismo `WriteBatch`. Si
   solo se borra el usuario, la invitación sigue y la persona se da de alta sola al volver a entrar.
 - Los IDs de `pases` son **determinísticos** para que un reintento sin internet no duplique documentos.

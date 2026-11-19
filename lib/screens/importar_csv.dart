@@ -27,9 +27,9 @@ class _ImportarCsvState extends State<ImportarCsv> {
   final _nombre = TextEditingController();
   late final StreamSubscription<void> _sub;
 
-  /// Grupo nuevo: IDs que ya existen, para avisar en vez de sobrescribir. `null` mientras carga.
-  /// Sale de la caché de Firestore, así que también funciona sin internet.
-  Set<String>? _idsExistentes;
+  /// Grupo nuevo: grupos que ya existen (ID → nombre), para avisar en vez de sobrescribir o repetir
+  /// nombre. `null` mientras carga. Sale de la caché de Firestore, así que también funciona sin internet.
+  Map<String, String>? _existentes;
 
   /// Reemplazo: la lista guardada hoy, para comparar. `null` mientras carga o si trae entradas
   /// sin reconocer: sin ella no hay comparación y "Reemplazar lista" no se activa.
@@ -58,7 +58,9 @@ class _ImportarCsvState extends State<ImportarCsv> {
             onError: alFallar,
           )
         : grupos().listen(
-            (s) => setState(() => _idsExistentes = {for (final d in s.docs) d.id}),
+            (s) => setState(() => _existentes = {
+                  for (final d in s.docs) d.id: '${d.data()['nombre'] ?? d.id}',
+                }),
             onError: alFallar,
           );
   }
@@ -121,15 +123,20 @@ class _ImportarCsvState extends State<ImportarCsv> {
     if (_nombre.text.trim().isEmpty) return null;
     final id = idGrupo(_nombre.text);
     if (id.isEmpty) return 'Usa letras o números en el nombre.';
-    if (_idsExistentes?.contains(id) ?? false) {
-      return 'Ya existe un grupo con el ID "$id". Usa otro nombre.';
+    final existentes = _existentes;
+    if (existentes == null) return null;
+    // Un grupo renombrado conserva el ID de su nombre original: se revisan los dos.
+    final otro = grupoConMismoNombre(_nombre.text, existentes);
+    if (otro != null) return 'Ya existe el grupo "$otro". Usa otro nombre.';
+    if (existentes.containsKey(id)) {
+      return 'Ya existe un grupo con el ID "$id" (se renombró a "${existentes[id]}"). Usa otro nombre.';
     }
     return null;
   }
 
   bool get _puedeSubir =>
       (_lista?.valida ?? false) &&
-      _idsExistentes != null &&
+      _existentes != null &&
       idGrupo(_nombre.text).isNotEmpty &&
       _errorNombre == null;
 

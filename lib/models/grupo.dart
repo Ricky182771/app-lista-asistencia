@@ -166,3 +166,39 @@ List<Alumno> cambiarActivo(List<Alumno> alumnos, int num, bool activo) => [
       for (final a in alumnos)
         a.num == num ? Alumno(num: num, nombre: a.nombre, activo: activo) : a,
     ];
+
+/// El nombre del grupo de [grupos] (ID → nombre) que ya se llama como [nombre], comparando como
+/// [idGrupo] (sin mayúsculas, acentos, espacios ni símbolos); `null` si no hay ninguno.
+/// [excepto] es el ID del grupo que se está renombrando: puede quedarse con su propio nombre.
+String? grupoConMismoNombre(String nombre, Map<String, String> grupos, {String? excepto}) {
+  final buscado = idGrupo(nombre);
+  if (buscado.isEmpty) return null;
+  for (final MapEntry(key: id, value: otro) in grupos.entries) {
+    if (id != excepto && idGrupo(otro) == buscado) return otro;
+  }
+  return null;
+}
+
+/// Por qué no se puede renombrar el grupo [id] a [nombre]; `null` si se puede.
+/// [grupos] son todos los grupos (ID → nombre), para no repetir nombres.
+String? errorRenombrar(String id, String nombre, Map<String, String> grupos) {
+  final limpio = limpiarNombre(nombre);
+  if (limpio.isEmpty) return 'Escribe el nombre del grupo.';
+  if (idGrupo(limpio).isEmpty) return 'Usa letras o números en el nombre.';
+  final otro = grupoConMismoNombre(limpio, grupos, excepto: id);
+  if (otro != null) return 'Ya existe el grupo "$otro".';
+  return null;
+}
+
+/// Confirmación al eliminar: lo escrito coincide con el nombre del grupo sin importar mayúsculas,
+/// acentos ni espacios de sobra.
+bool confirmaNombre(String escrito, String nombre) {
+  final a = sinAcentos(limpiarNombre(escrito));
+  return a.isNotEmpty && a == sinAcentos(limpiarNombre(nombre));
+}
+
+/// Parte [lista] en lotes de [tamano] como máximo (un `WriteBatch` acepta hasta 500 escrituras).
+List<List<T>> enLotes<T>(List<T> lista, int tamano) => [
+      for (var i = 0; i < lista.length; i += tamano)
+        lista.sublist(i, i + tamano > lista.length ? lista.length : i + tamano),
+    ];

@@ -219,4 +219,58 @@ void main() {
       expect(alta.map((a) => a.num), [1, 2, 5]);
     });
   });
+
+  group('grupoConMismoNombre', () {
+    const grupos = {'ia-3a': 'IA 3A', 'ia-3b': 'IA 3B', 'prog-5a': 'Programación 5C'};
+    test('compara sin mayúsculas, acentos ni símbolos', () {
+      expect(grupoConMismoNombre('ia  3a', grupos), 'IA 3A');
+      expect(grupoConMismoNombre('PROGRAMACION 5C', grupos), 'Programación 5C');
+      expect(grupoConMismoNombre('IA 3C', grupos), isNull);
+    });
+    test('compara contra el nombre, no contra el ID (un grupo renombrado conserva su ID)', () {
+      expect(grupoConMismoNombre('Prog 5A', grupos), isNull);
+    });
+    test('el grupo que se renombra puede quedarse con su nombre', () {
+      expect(grupoConMismoNombre('ia 3a', grupos, excepto: 'ia-3a'), isNull);
+      expect(grupoConMismoNombre('ia 3b', grupos, excepto: 'ia-3a'), 'IA 3B');
+    });
+    test('un nombre sin letras ni números no choca con nada', () {
+      expect(grupoConMismoNombre('°/-', grupos), isNull);
+    });
+  });
+
+  group('errorRenombrar', () {
+    const grupos = {'ia-3a': 'IA 3A', 'ia-3b': 'IA 3B'};
+    test('vacío o sin letras ni números', () {
+      expect(errorRenombrar('ia-3a', '   ', grupos), 'Escribe el nombre del grupo.');
+      expect(errorRenombrar('ia-3a', '°/', grupos), 'Usa letras o números en el nombre.');
+    });
+    test('no repite el nombre de otro grupo', () {
+      expect(errorRenombrar('ia-3a', 'ia 3b', grupos), 'Ya existe el grupo "IA 3B".');
+    });
+    test('nombre nuevo, o el mismo con otras mayúsculas', () {
+      expect(errorRenombrar('ia-3a', 'IA 3A Matutino', grupos), isNull);
+      expect(errorRenombrar('ia-3a', 'Ia 3a', grupos), isNull);
+    });
+  });
+
+  test('confirmaNombre ignora mayúsculas, acentos y espacios de sobra, pero no acepta vacío', () {
+    expect(confirmaNombre('  ia   3a ', 'IA 3A'), isTrue);
+    expect(confirmaNombre('programacion 5c', 'Programación 5C'), isTrue);
+    expect(confirmaNombre('IA 3', 'IA 3A'), isFalse);
+    expect(confirmaNombre('', ''), isFalse);
+  });
+
+  test('enLotes parte la lista sin perder ni repetir elementos', () {
+    expect(enLotes([1, 2, 3, 4, 5], 2), [
+      [1, 2],
+      [3, 4],
+      [5],
+    ]);
+    expect(enLotes([1, 2], 400), [
+      [1, 2],
+    ]);
+    expect(enLotes(<int>[], 400), isEmpty);
+    expect(enLotes(List.generate(901, (i) => i), 400).map((l) => l.length), [400, 400, 101]);
+  });
 }

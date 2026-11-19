@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 
 import '../models/grupo.dart';
 import '../services/grupos.dart';
+import 'acciones_grupo.dart';
 import 'clases_grupo.dart';
 import 'importar_csv.dart';
 import 'inicio.dart';
 
-/// Un grupo: sus clases y su lista de alumnos, con reemplazo por CSV y edición a mano.
+/// Un grupo: sus clases y su lista de alumnos, con reemplazo por CSV y edición a mano. Desde el menú
+/// de la barra se renombra o se elimina el grupo completo (ver `acciones_grupo.dart`).
 /// No hay forma de borrar a un alumno: se da de baja y conserva su N.L y su historial.
 class EditarGrupo extends StatefulWidget {
   const EditarGrupo({super.key, required this.grupoId, required this.nombre});
@@ -90,7 +92,20 @@ class _EditarGrupoState extends State<EditarGrupo> {
   Widget build(BuildContext context) {
     final doc = _grupo;
     return Scaffold(
-      appBar: AppBar(title: Text(_nombre)),
+      appBar: AppBar(
+        title: Text(_nombre),
+        actions: [
+          MenuGrupo(
+            grupoId: widget.grupoId,
+            nombre: _nombre,
+            enabled: doc != null && doc.exists,
+            // Borrado el grupo, esta pantalla ya no tiene nada que mostrar.
+            alEliminar: () {
+              if (mounted) Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
       body: _error != null
           ? Center(child: Text('Error al cargar: $_error'))
           : doc == null

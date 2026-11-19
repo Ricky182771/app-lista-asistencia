@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../models/rol.dart';
 import '../services/grupos.dart';
 import '../services/sesion.dart';
+import 'acciones_grupo.dart';
 import 'datos_prueba.dart';
 import 'editar_grupo.dart';
 import 'importar_csv.dart';
@@ -135,21 +136,20 @@ class _AdminHomeState extends State<AdminHome> {
     final activos = alumnos is List
         ? alumnos.where((a) => a is Map && a['activo'] != false).length
         : 0;
+    final nombre = '${d.data()['nombre'] ?? d.id}';
     return ListTile(
       leading: Icon(
         d.metadata.hasPendingWrites ? Icons.cloud_upload_outlined : Icons.groups_outlined,
       ),
-      title: Text('${d.data()['nombre'] ?? d.id}'),
+      title: Text(nombre),
       subtitle: Text([
         activos == 1 ? '1 alumno' : '$activos alumnos',
         if (d.metadata.hasPendingWrites) 'pendiente de sincronizar',
       ].join(' · ')),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: MenuGrupo(grupoId: d.id, nombre: nombre),
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute<void>(
-          builder: (_) => EditarGrupo(grupoId: d.id, nombre: '${d.data()['nombre'] ?? d.id}'),
-        ),
+        MaterialPageRoute<void>(builder: (_) => EditarGrupo(grupoId: d.id, nombre: nombre)),
       ),
     );
   }

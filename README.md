@@ -5,7 +5,7 @@ App de lista de asistencia por clase para la escuela. Proyecto de servicio socia
 
 - **Profesores:** pasan lista en cada clase desde Android o desde el navegador (iPhone y computadoras). Funciona sin internet y sincroniza después.
 - **Encargados de orden:** ven los ausentes de cada grupo y copian un mensaje listo para el grupo de padres.
-- **Administrativos:** suben las listas en CSV, dan de alta clases e invitan usuarios.
+- **Administrativos:** suben las listas en CSV, dan de alta clases, renombran o eliminan grupos e invitan usuarios.
 
 **Stack:** Flutter (Android + web) · Firebase Authentication (Google) · Cloud Firestore · Firebase Hosting.
 **Entrega:** antes del 10 de diciembre de 2026.

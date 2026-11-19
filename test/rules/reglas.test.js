@@ -20,6 +20,7 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 
 /** Fecha "AAAA-MM-DD" a `dias` de hoy (UTC, igual que timestamp.date en las reglas). */
@@ -193,6 +194,44 @@ describe('grupos y clases', () => {
     await assertFails(setDoc(doc(db, 'grupos/g3'), { nombre: '1C', profesores: [], alumnos: [] }));
     await assertFails(setDoc(doc(db, 'clases/orden_g1'), { profesorUid: 'orden', grupoId: 'g1' }));
     await assertFails(updateDoc(doc(db, `pases/profe_g1_${HACE_5}`), { 'estados.1': 1 }));
+  });
+});
+
+describe('renombrar y eliminar un grupo completo', () => {
+  /** Lo mismo que hace `borrarGrupo`: pases, luego clase y grupo. */
+  const borrarG1 = (db) => {
+    const lote = writeBatch(db);
+    lote.delete(doc(db, `pases/profe_g1_${HACE_5}`));
+    lote.delete(doc(db, 'clases/profe_g1'));
+    lote.delete(doc(db, 'grupos/g1'));
+    return lote.commit();
+  };
+
+  test('el admin renombra un grupo', async () => {
+    await assertSucceeds(updateDoc(doc(como('admin'), 'grupos/g1'), { nombre: '1A Matutino' }));
+  });
+
+  test('profe y orden no renombran', async () => {
+    await assertFails(updateDoc(doc(como('profe'), 'grupos/g1'), { nombre: 'X' }));
+    await assertFails(updateDoc(doc(como('orden'), 'grupos/g1'), { nombre: 'X' }));
+  });
+
+  test('el admin consulta los pases del grupo y borra pases, clases y grupo', async () => {
+    const db = como('admin');
+    await assertSucceeds(getDocs(query(collection(db, 'pases'), where('grupoId', '==', 'g1'))));
+    await assertSucceeds(getDocs(query(collection(db, 'clases'), where('grupoId', '==', 'g1'))));
+    await assertSucceeds(borrarG1(db));
+  });
+
+  test('profe y orden no eliminan grupos', async () => {
+    await assertFails(borrarG1(como('profe')));
+    await assertFails(borrarG1(como('orden')));
+  });
+
+  test('borrada la clase, un pase atrasado de esa clase ya no entra', async () => {
+    await assertSucceeds(borrarG1(como('admin')));
+    await assertFails(setDoc(doc(como('profe'), `pases/profe_g1_${fecha(-1)}`),
+      pase('profe_g1', 'g1', 'profe', fecha(-1))));
   });
 });
 
