@@ -18,5 +18,13 @@
       ]
     }
   ],
-  "fieldOverrides": []
+   "fieldOverrides": [
+    { "collectionGroup": "pases",  "fieldPath": "estados",   "ttl": false, "indexes": [] },
+    { "collectionGroup": "pases",  "fieldPath": "marcadoEn", "ttl": false, "indexes": [] },
+    { "collectionGroup": "pases",  "fieldPath": "enviadoEn", "ttl": false, "indexes": [] },
+    { "collectionGroup": "pases",  "fieldPath": "editadoEn", "ttl": false, "indexes": [] },
+    { "collectionGroup": "pases",  "fieldPath": "materia",   "ttl": false, "indexes": [] },
+    { "collectionGroup": "pases",  "fieldPath": "salon",     "ttl": false, "indexes": [] },
+    { "collectionGroup": "grupos", "fieldPath": "alumnos",   "ttl": false, "indexes": [] }
+  ]
 }
