@@ -15,7 +15,11 @@ import 'services/sesion.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Web: el inicio de sesión usa el dominio desde el que se abrió la app (ver `opcionesWeb`).
+  await Firebase.initializeApp(
+      options: kIsWeb
+          ? opcionesWeb(DefaultFirebaseOptions.web, Uri.base.host)
+          : DefaultFirebaseOptions.currentPlatform);
   // En Android la caché offline ya viene activada; en web depende de la casilla de computadora compartida.
   if (kIsWeb) await configurarWeb();
   await iniciarGoogleSignIn();

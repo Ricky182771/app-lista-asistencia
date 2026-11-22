@@ -1,10 +1,40 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'package:app_lista_asistencia/services/sesion.dart';
 
 void main() {
+  group('opcionesWeb', () {
+    const base = FirebaseOptions(
+      apiKey: 'clave',
+      appId: 'app',
+      messagingSenderId: '1',
+      projectId: 'paselista-9326a',
+      authDomain: 'paselista-9326a.firebaseapp.com',
+      storageBucket: 'cubeta',
+    );
+
+    test('en web.app el inicio de sesión usa web.app y lo demás no cambia', () {
+      final o = opcionesWeb(base, 'paselista-9326a.web.app');
+      expect(o.authDomain, 'paselista-9326a.web.app');
+      expect(
+        [o.apiKey, o.appId, o.messagingSenderId, o.projectId, o.storageBucket],
+        [base.apiKey, base.appId, base.messagingSenderId, base.projectId, base.storageBucket],
+      );
+    });
+
+    test('en firebaseapp.com se queda igual', () {
+      expect(opcionesWeb(base, 'paselista-9326a.firebaseapp.com'), same(base));
+    });
+
+    test('fuera de Hosting (localhost, otro dominio) se queda igual', () {
+      expect(opcionesWeb(base, 'localhost'), same(base));
+      expect(opcionesWeb(base, 'otro.web.app'), same(base));
+    });
+  });
+
   group('computadora compartida (web)', () {
     test('sin nada guardado o con cualquier valor que no sea "no" cuenta como compartida', () {
       expect(esCompartida(null), isTrue);
