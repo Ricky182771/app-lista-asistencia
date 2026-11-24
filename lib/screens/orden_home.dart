@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models/clase.dart' show profeYSalon;
 import '../models/orden.dart';
 import '../models/pase.dart';
 import '../services/pases.dart';
@@ -23,6 +24,13 @@ class _Datos extends ChangeNotifier {
   }
 
   bool get sinConexion => [grupos, clases, pases].any((s) => s?.metadata.isFromCache ?? false);
+
+  /// Nombre del profe de la clase del pase (`clases.profesorNombre`); `''` si la clase se borró o
+  /// todavía no tiene el nombre (lo llena el admin, ver `nombresDesactualizados`).
+  String profeDe(Map<String, dynamic> pase) {
+    final clase = clases?.docs.where((c) => c.id == pase['claseId']).firstOrNull;
+    return '${clase?.data()['profesorNombre'] ?? ''}';
+  }
 
   List<Map<String, dynamic>> pasesDe(String grupoId) => [
     for (final p in [...?pases?.docs])
@@ -222,8 +230,12 @@ class _GrupoDetalle extends StatelessWidget {
               if (manana == null)
                 const Padding(padding: EdgeInsets.only(top: 8), child: Text('Todavía no hay pase de este día.'))
               else ...[
+                Text('${manana['materia'] ?? ''}'),
                 Text(
-                  '${manana['materia'] ?? ''} · Salón ${manana['salon'] ?? ''} · ${_hora(context, manana['marcadoEn'])}',
+                  [
+                    profeYSalon(datos.profeDe(manana), '${manana['salon'] ?? ''}'),
+                    _hora(context, manana['marcadoEn']),
+                  ].where((t) => t.isNotEmpty).join(' · '),
                 ),
                 ..._lista(context, 'Faltas sin justificar', faltas),
                 ..._lista(context, 'Faltas justificadas', alumnosConEstado(alumnos, _estados(manana), justificada)),
@@ -260,10 +272,14 @@ class _GrupoDetalle extends StatelessWidget {
     String nombre,
   ) async {
     String materia(QueryDocumentSnapshot<Map<String, dynamic>> c) => '${c.data()['materia'] ?? ''}';
+    String detalle(QueryDocumentSnapshot<Map<String, dynamic>> c) =>
+        profeYSalon('${c.data()['profesorNombre'] ?? ''}', '${c.data()['salon'] ?? ''}');
+    String llave(QueryDocumentSnapshot<Map<String, dynamic>> c) =>
+        '${materia(c).toLowerCase()}\n${detalle(c).toLowerCase()}';
     final clases = [
       for (final c in [...?datos.clases?.docs])
         if (c.data()['grupoId'] == grupoId) c,
-    ]..sort((a, b) => materia(a).toLowerCase().compareTo(materia(b).toLowerCase()));
+    ]..sort((a, b) => llave(a).compareTo(llave(b)));
     if (clases.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Este grupo todavía no tiene clases.')),
@@ -283,7 +299,7 @@ class _GrupoDetalle extends StatelessWidget {
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(materia(c)),
-                      subtitle: Text('Salón ${c.data()['salon'] ?? ''}'),
+                      subtitle: Text(detalle(c)),
                     ),
                   ),
               ],
@@ -295,6 +311,7 @@ class _GrupoDetalle extends StatelessWidget {
       claseId: elegida.id,
       grupo: grupo,
       titulo: '$nombre · ${materia(elegida)}',
+      subtitulo: detalle(elegida),
       mes: DateTime.parse(fecha),
     );
   }
@@ -309,7 +326,12 @@ class _GrupoDetalle extends StatelessWidget {
       childrenPadding: const EdgeInsets.only(bottom: 8),
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       title: Text('${p['materia'] ?? ''} · ${_hora(context, p['marcadoEn'])}'),
-      subtitle: Text('Salón ${p['salon'] ?? ''} · Faltas: ${faltas.length} · Justificadas: ${justificadas.length}'),
+      subtitle: Text(
+        [
+          profeYSalon(datos.profeDe(p), '${p['salon'] ?? ''}'),
+          'Faltas: ${faltas.length} · Justificadas: ${justificadas.length}',
+        ].where((t) => t.isNotEmpty).join('\n'),
+      ),
       children: [
         ..._lista(context, 'Faltas sin justificar', faltas),
         ..._lista(context, 'Faltas justificadas', justificadas),

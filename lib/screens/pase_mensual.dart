@@ -34,6 +34,7 @@ void abrirConsultaMensual(
   required String claseId,
   required DocumentSnapshot<Map<String, dynamic>> grupo,
   required String titulo,
+  String subtitulo = '',
   DateTime? mes,
 }) {
   Navigator.push(
@@ -43,6 +44,7 @@ void abrirConsultaMensual(
         claseId: claseId,
         grupo: grupo,
         titulo: titulo,
+        subtitulo: subtitulo,
         mes: mes ?? DateTime.now(),
         soloLectura: true,
       ),
@@ -59,11 +61,18 @@ class PaseMensual extends StatefulWidget {
     required this.grupo,
     required this.titulo,
     required this.mes,
+    this.subtitulo = '',
     this.soloLectura = false,
   });
   final String claseId;
   final DocumentSnapshot<Map<String, dynamic>> grupo;
+
+  /// "Grupo · Materia". También va en el nombre del archivo exportado.
   final String titulo;
+
+  /// "Prof. Nombre · Salón A7" (ver `profeYSalon`); va bajo el título y en el encabezado del .xlsx.
+  /// Vacío en la vista del propio profe.
+  final String subtitulo;
   final DateTime mes;
 
   /// Para admin y orden: no se edita nada y las consultas no filtran por profesor (las reglas les
@@ -147,6 +156,7 @@ class _PaseMensualState extends State<PaseMensual> {
 
       final registro = Registro(
         titulo: widget.titulo,
+        subtitulo: widget.subtitulo,
         pases: pases,
         alumnos: (widget.grupo.data()?['alumnos'] as List?) ?? const [],
         meses: eleccion.meses,
@@ -178,7 +188,22 @@ class _PaseMensualState extends State<PaseMensual> {
     final snap = _snap;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.titulo),
+        title: widget.subtitulo.isEmpty
+            ? Text(widget.titulo)
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.titulo, overflow: TextOverflow.ellipsis),
+                  Text(
+                    widget.subtitulo,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
         actions: [
           IconButton(
             tooltip: 'Exportar registro (Excel o CSV)',

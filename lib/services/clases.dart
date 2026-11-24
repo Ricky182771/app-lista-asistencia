@@ -31,6 +31,22 @@ Future<void> darDeAltaClase(Clase clase) => (_db.batch()
 Future<void> editarClase(Clase clase) =>
     _db.doc('clases/${clase.id}').update({'materia': clase.materia, 'salon': clase.salon});
 
+/// Pone al día `profesorNombre` en las clases de [cambios] (claseId → nombre, de
+/// `nombresDesactualizados`), en lotes de 400 (límite de `WriteBatch`: 500).
+/// Sin `await` a propósito (ver [darDeAltaClase]).
+List<Future<void>> ponerNombresDeProfes(Map<String, String> cambios) {
+  final ids = cambios.keys.toList();
+  final lotes = <Future<void>>[];
+  for (var i = 0; i < ids.length; i += 400) {
+    final batch = _db.batch();
+    for (final id in ids.skip(i).take(400)) {
+      batch.update(_db.doc('clases/$id'), {'profesorNombre': cambios[id]});
+    }
+    lotes.add(batch.commit());
+  }
+  return lotes;
+}
+
 /// Borra la clase y, en el mismo `WriteBatch`, quita al profe de `grupos.profesores` si
 /// [quitarProfe] (ver `quitarProfeDelGrupo`). Los pases ya hechos se conservan.
 /// Sin `await` a propósito (ver [darDeAltaClase]).
