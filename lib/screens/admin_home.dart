@@ -4,8 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../models/clase.dart' show claseDe, nombresDesactualizados;
 import '../models/rol.dart';
+import '../services/clases.dart' show ponerNombresDeProfes;
 import '../services/grupos.dart';
+import '../services/pases.dart' show todasLasClases;
 import '../services/sesion.dart';
 import 'acciones_grupo.dart';
 import 'datos_prueba.dart';
@@ -27,6 +30,7 @@ class _AdminHomeState extends State<AdminHome> {
   // creado tarde se perdería el primer snapshot.
   QuerySnapshot<Map<String, dynamic>>? _usuarios, _invitaciones, _grupos;
   Object? _errorUsuarios, _errorInvitaciones, _errorGrupos;
+  QuerySnapshot<Map<String, dynamic>>? _clases;
   late final List<StreamSubscription<void>> _subs;
 
   @override
@@ -34,9 +38,17 @@ class _AdminHomeState extends State<AdminHome> {
     super.initState();
     _subs = [
       usuarios().listen(
-        (s) => setState(() => _usuarios = s),
+        (s) {
+          setState(() => _usuarios = s);
+          _ponerAlDiaNombres();
+        },
         onError: (Object e) => setState(() => _errorUsuarios = e),
       ),
+      // Solo para poner al día `clases.profesorNombre`; si falla, la app sigue igual.
+      todasLasClases().listen((s) {
+        _clases = s;
+        _ponerAlDiaNombres();
+      }, onError: (Object _) {}),
       invitaciones().listen(
         (s) => setState(() => _invitaciones = s),
         onError: (Object e) => setState(() => _errorInvitaciones = e),
@@ -46,6 +58,23 @@ class _AdminHomeState extends State<AdminHome> {
         onError: (Object e) => setState(() => _errorGrupos = e),
       ),
     ];
+  }
+
+  /// El encargado de orden ve el nombre del profe en `clases.profesorNombre` (no puede leer
+  /// `usuarios`). Aquí se llena en las clases viejas y se corrige si el profe cambió de nombre. Espera
+  /// a que los usuarios lleguen del servidor para no escribir un nombre viejo de la caché. Sin `await`:
+  /// la escritura local se ve al instante en `_clases`, así que no se repite.
+  void _ponerAlDiaNombres() {
+    final usuarios = _usuarios, clases = _clases;
+    if (usuarios == null || clases == null || usuarios.metadata.isFromCache) return;
+    final cambios = nombresDesactualizados(
+      [for (final d in clases.docs) ?claseDe(d.id, d.data())],
+      {for (final d in usuarios.docs) d.id: '${d.data()['nombre'] ?? ''}'},
+    );
+    if (cambios.isEmpty) return;
+    for (final lote in ponerNombresDeProfes(cambios)) {
+      avisarSiFalla(context, lote, 'No se actualizó el nombre del profesor en sus clases');
+    }
   }
 
   @override

@@ -158,6 +158,7 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
                         claseId: c.id,
                         grupo: widget.grupo,
                         titulo: '${widget.nombreGrupo} · ${c.materia}',
+                        subtitulo: profeYSalon(nombres[c.profesorUid] ?? c.profesorNombre, c.salon),
                       ),
                     ),
                     IconButton(
@@ -221,12 +222,14 @@ class _DialogoClaseState extends State<_DialogoClase> {
       _errorSalon = errorEtiqueta(_salon.text, 'el salón');
     });
     if (_errorProfesor != null || _errorMateria != null || _errorSalon != null) return;
+    final profe = widget.profesores.where((d) => d.id == _profesorUid).firstOrNull?.data();
     final clase = Clase(
       id: widget.editar?.id ?? '',
       profesorUid: _profesorUid!,
       grupoId: widget.grupoId,
       materia: limpiarNombre(_materia.text),
       salon: limpiarNombre(_salon.text),
+      profesorNombre: '${profe?['nombre'] ?? widget.editar?.profesorNombre ?? ''}'.trim(),
     );
     if (materiaRepetida(widget.clases, clase)) {
       setState(() => _errorMateria = 'Este profesor ya da esa materia a este grupo.');
