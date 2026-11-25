@@ -21,6 +21,26 @@ void main() {
     expect(normalizarCorreo('ya@normal.mx'), 'ya@normal.mx');
   });
 
+  group('invitacionesSinUsar', () {
+    test('quita las de correos que ya tienen usuario', () {
+      expect(
+        invitacionesSinUsar(['ana@x.mx', 'beto@x.mx', 'caro@x.mx'], ['beto@x.mx']),
+        {'ana@x.mx', 'caro@x.mx'},
+      );
+    });
+    test('el correo del usuario puede traer mayúsculas o espacios (viene del token de Google)', () {
+      expect(invitacionesSinUsar(['ana.perez@gmail.com'], [' Ana.Perez@Gmail.com']), isEmpty);
+    });
+    test('sin usuarios, todas están sin usar; sin invitaciones, ninguna', () {
+      expect(invitacionesSinUsar(['ana@x.mx'], []), {'ana@x.mx'});
+      expect(invitacionesSinUsar([], ['ana@x.mx']), isEmpty);
+    });
+  });
+
+  test('cada rol tiene su plural para los filtros', () {
+    expect([for (final r in Rol.values) r.plural], ['Profesores', 'Encargados de orden', 'Administrativos']);
+  });
+
   group('decidirPantalla', () {
     test('sin sesión va al login aunque haya datos', () {
       expect(decidirPantalla(conSesion: false), Pantalla.login);

@@ -25,8 +25,8 @@ class AdminHome extends StatefulWidget {
   State<AdminHome> createState() => _AdminHomeState();
 }
 
-/// Inicio del admin en tres pestañas: Grupos (y sus clases), Usuarios e Invitaciones. La cuenta y
-/// cerrar sesión van en el menú del avatar, arriba a la derecha.
+/// Inicio del admin en dos pestañas: Grupos (y sus clases) y Usuarios (con las invitaciones que
+/// aún nadie usa). La cuenta y cerrar sesión van en el menú del avatar, arriba a la derecha.
 class _AdminHomeState extends State<AdminHome> {
   final _miUid = FirebaseAuth.instance.currentUser?.uid;
   // Suscripciones en el estado: cada pestaña construye su lista al abrirse y un StreamBuilder
@@ -35,6 +35,9 @@ class _AdminHomeState extends State<AdminHome> {
   Object? _errorUsuarios, _errorInvitaciones, _errorGrupos;
   QuerySnapshot<Map<String, dynamic>>? _clases;
   late final List<StreamSubscription<void>> _subs;
+
+  /// Filtro de la pestaña Usuarios; `null` = todos los roles.
+  Rol? _filtro;
 
   @override
   void initState() {
@@ -91,17 +94,19 @@ class _AdminHomeState extends State<AdminHome> {
 
   @override
   Widget build(BuildContext context) {
-    final usuariosOrdenados = [...?_usuarios?.docs]
+    final usuarios = [...?_usuarios?.docs]
       ..sort((a, b) => '${a.data()['nombre']}'.compareTo('${b.data()['nombre']}'));
-    final conUsuario = {for (final d in usuariosOrdenados) '${d.data()['email']}'};
-    final invitaciones = [...?_invitaciones?.docs]
-      ..sort((a, b) {
-        // Primero las que nadie ha usado (las que se pueden cancelar), luego por correo.
-        final usoA = conUsuario.contains(a.id) ? 1 : 0, usoB = conUsuario.contains(b.id) ? 1 : 0;
-        return usoA != usoB ? usoA - usoB : a.id.compareTo(b.id);
-      });
-    // Sin la lista de usuarios no se sabe cuáles están en uso: no se cuenta nada.
-    final sinUsar = _usuarios == null ? 0 : invitaciones.where((d) => !conUsuario.contains(d.id)).length;
+    // Sin la lista de usuarios no se sabe cuáles invitaciones ya se usaron: no se muestra ninguna.
+    final sinUsar = _usuarios == null
+        ? <String>{}
+        : invitacionesSinUsar(
+            [for (final d in [...?_invitaciones?.docs]) d.id],
+            [for (final d in usuarios) '${d.data()['email'] ?? ''}'],
+          );
+    final pendientes = [
+      for (final d in [...?_invitaciones?.docs])
+        if (sinUsar.contains(d.id)) d,
+    ]..sort((a, b) => a.id.compareTo(b.id));
     final grupos = [...?_grupos?.docs]
       ..sort((a, b) => '${a.data()['nombre'] ?? a.id}'.compareTo('${b.data()['nombre'] ?? b.id}'));
     final clasesPorGrupo = <String, int>{};
@@ -111,7 +116,7 @@ class _AdminHomeState extends State<AdminHome> {
     }
 
     return DefaultTabController(
-      length: 3,
+      length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('PaseLista'),
@@ -119,13 +124,12 @@ class _AdminHomeState extends State<AdminHome> {
           bottom: TabBar(
             tabs: [
               const Tab(text: 'Grupos'),
-              const Tab(text: 'Usuarios'),
               Tab(
                 child: Badge(
-                  isLabelVisible: sinUsar > 0,
-                  label: Text('$sinUsar'),
+                  isLabelVisible: pendientes.isNotEmpty,
+                  label: Text('${pendientes.length}'),
                   offset: const Offset(14, -6),
-                  child: const Text('Invitaciones'),
+                  child: const Text('Usuarios'),
                 ),
               ),
             ],
@@ -155,22 +159,7 @@ class _AdminHomeState extends State<AdminHome> {
                       for (final d in grupos) _filaGrupo(d, clasesPorGrupo[d.id]),
                     ]),
                   ]),
-                  _pestana('usuarios', [
-                    _boton(icono: Icons.person_add, texto: 'Invitar usuario', onPressed: _invitar),
-                    const _Ayuda('Quienes ya entraron a PaseLista. Quitar el acceso borra también su '
-                        'invitación.'),
-                    ..._seccion(_usuarios, _errorUsuarios, 'Aún no hay usuarios.', [
-                      for (final d in usuariosOrdenados) _filaUsuario(d),
-                    ]),
-                  ]),
-                  _pestana('invitaciones', [
-                    _boton(icono: Icons.person_add, texto: 'Invitar usuario', onPressed: _invitar),
-                    const _Ayuda('Correos que pueden entrar. "En uso" = esa persona ya entró y '
-                        'aparece en Usuarios.'),
-                    ..._seccion(_invitaciones, _errorInvitaciones, 'Aún no hay invitaciones.', [
-                      for (final d in invitaciones) _filaInvitacion(d, conUsuario),
-                    ]),
-                  ]),
+                  _pestana('usuarios', _pestanaUsuarios(usuarios, pendientes)),
                 ],
               ),
             ),
@@ -178,6 +167,61 @@ class _AdminHomeState extends State<AdminHome> {
         ),
       ),
     );
+  }
+
+  /// Invitar, filtro por rol, las invitaciones que esperan su primer inicio de sesión (se pueden
+  /// cancelar) y los usuarios con acceso. Al entrar por primera vez, la persona deja de estar en
+  /// "Esperando…" y aparece en "Con acceso".
+  List<Widget> _pestanaUsuarios(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> usuarios,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> pendientes,
+  ) {
+    bool pasa(Object? rol) => _filtro == null || parseRol(rol) == _filtro;
+    int cuantos(Rol? r) => [...usuarios, ...pendientes]
+        .where((d) => r == null || parseRol(d.data()['rol']) == r)
+        .length;
+    final titulo = Theme.of(context).textTheme.titleSmall;
+    final usuariosFiltrados = [for (final d in usuarios) if (pasa(d.data()['rol'])) d];
+    final pendientesFiltrados = [for (final d in pendientes) if (pasa(d.data()['rol'])) d];
+    final nombreFiltro = _filtro?.plural.toLowerCase();
+
+    return [
+      _boton(icono: Icons.person_add, texto: 'Invitar usuario', onPressed: _invitar),
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final r in <Rol?>[null, ...Rol.values])
+            ChoiceChip(
+              label: Text('${r?.plural ?? 'Todos'} (${cuantos(r)})'),
+              selected: _filtro == r,
+              onSelected: (_) => setState(() => _filtro = r),
+            ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      if (_errorInvitaciones != null) Text('Error al cargar las invitaciones: $_errorInvitaciones'),
+      if (pendientesFiltrados.isNotEmpty) ...[
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text('Esperando su primer inicio de sesión (${pendientesFiltrados.length})', style: titulo),
+        ),
+        const _Ayuda('Ya pueden entrar con su cuenta de Google. Si te equivocaste de correo, cancela '
+            'la invitación.'),
+        for (final d in pendientesFiltrados) _filaInvitacion(d),
+        const SizedBox(height: 8),
+      ],
+      Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text('Con acceso${_usuarios == null ? '' : ' (${usuariosFiltrados.length})'}', style: titulo),
+      ),
+      ..._seccion(
+        _usuarios,
+        _errorUsuarios,
+        nombreFiltro == null ? 'Aún no hay usuarios.' : 'No hay $nombreFiltro con acceso.',
+        [for (final d in usuariosFiltrados) _filaUsuario(d)],
+      ),
+    ];
   }
 
   void _invitar() => showDialog<void>(context: context, builder: (_) => const _DialogoInvitar());
@@ -198,33 +242,23 @@ class _AdminHomeState extends State<AdminHome> {
         ),
       );
 
-  Widget _filaInvitacion(QueryDocumentSnapshot<Map<String, dynamic>> d, Set<String> conUsuario) {
-    final enUso = conUsuario.contains(d.id);
+  Widget _filaInvitacion(QueryDocumentSnapshot<Map<String, dynamic>> d) {
     return ListTile(
-      leading: Icon(
-        d.metadata.hasPendingWrites
-            ? Icons.cloud_upload_outlined
-            : enUso
-                ? Icons.how_to_reg_outlined
-                : Icons.mail_outline,
-      ),
+      leading: Icon(d.metadata.hasPendingWrites ? Icons.cloud_upload_outlined : Icons.mail_outline),
       title: Text(d.id),
       subtitle: Text([
         parseRol(d.data()['rol'])?.etiqueta ?? '${d.data()['rol']}',
-        if (enUso) 'en uso' else if (_usuarios != null) 'aún no entra',
+        'aún no entra',
         if (d.metadata.hasPendingWrites) 'pendiente de sincronizar',
       ].join(' · ')),
-      // Sin la lista de usuarios no se sabe si está en uso: no se ofrece cancelar.
-      trailing: _usuarios == null || enUso
-          ? null
-          : IconButton(
-              tooltip: 'Cancelar invitación',
-              icon: const Icon(Icons.close),
-              onPressed: () => _avisarSiFalla(
-                cancelarInvitacion(d.id),
-                'No se canceló la invitación de ${d.id}',
-              ),
-            ),
+      trailing: IconButton(
+        tooltip: 'Cancelar invitación',
+        icon: const Icon(Icons.close),
+        onPressed: () => _avisarSiFalla(
+          cancelarInvitacion(d.id),
+          'No se canceló la invitación de ${d.id}',
+        ),
+      ),
     );
   }
 
