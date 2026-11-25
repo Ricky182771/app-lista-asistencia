@@ -11,6 +11,7 @@ import '../services/grupos.dart';
 import '../services/pases.dart' show todasLasClases;
 import '../services/sesion.dart';
 import 'acciones_grupo.dart';
+import 'aviso_actualizacion.dart';
 import 'datos_prueba.dart';
 import 'editar_grupo.dart';
 import 'importar_csv.dart';
@@ -24,9 +25,11 @@ class AdminHome extends StatefulWidget {
   State<AdminHome> createState() => _AdminHomeState();
 }
 
+/// Inicio del admin en tres pestañas: Grupos (y sus clases), Usuarios e Invitaciones. La cuenta y
+/// cerrar sesión van en el menú del avatar, arriba a la derecha.
 class _AdminHomeState extends State<AdminHome> {
   final _miUid = FirebaseAuth.instance.currentUser?.uid;
-  // Suscripciones en el estado: el ListView de Inicio construye perezosamente y un StreamBuilder
+  // Suscripciones en el estado: cada pestaña construye su lista al abrirse y un StreamBuilder
   // creado tarde se perdería el primer snapshot.
   QuerySnapshot<Map<String, dynamic>>? _usuarios, _invitaciones, _grupos;
   Object? _errorUsuarios, _errorInvitaciones, _errorGrupos;
@@ -45,8 +48,9 @@ class _AdminHomeState extends State<AdminHome> {
         onError: (Object e) => setState(() => _errorUsuarios = e),
       ),
       // Solo para poner al día `clases.profesorNombre`; si falla, la app sigue igual.
+      // También da el número de clases de cada grupo; si falla, la pestaña Grupos no lo muestra.
       todasLasClases().listen((s) {
-        _clases = s;
+        setState(() => _clases = s);
         _ponerAlDiaNombres();
       }, onError: (Object _) {}),
       invitaciones().listen(
@@ -87,80 +91,145 @@ class _AdminHomeState extends State<AdminHome> {
 
   @override
   Widget build(BuildContext context) {
-    final titulo = Theme.of(context).textTheme.titleMedium;
     final usuariosOrdenados = [...?_usuarios?.docs]
       ..sort((a, b) => '${a.data()['nombre']}'.compareTo('${b.data()['nombre']}'));
     final conUsuario = {for (final d in usuariosOrdenados) '${d.data()['email']}'};
-    return Inicio(
-      usuario: widget.usuario,
-      children: [
-        const BotonDatosPrueba(), // solo en depuración
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (_) => const _DialogoInvitar(),
-            ),
-            icon: const Icon(Icons.person_add),
-            label: const Text('Invitar usuario'),
+    final invitaciones = [...?_invitaciones?.docs]
+      ..sort((a, b) {
+        // Primero las que nadie ha usado (las que se pueden cancelar), luego por correo.
+        final usoA = conUsuario.contains(a.id) ? 1 : 0, usoB = conUsuario.contains(b.id) ? 1 : 0;
+        return usoA != usoB ? usoA - usoB : a.id.compareTo(b.id);
+      });
+    // Sin la lista de usuarios no se sabe cuáles están en uso: no se cuenta nada.
+    final sinUsar = _usuarios == null ? 0 : invitaciones.where((d) => !conUsuario.contains(d.id)).length;
+    final grupos = [...?_grupos?.docs]
+      ..sort((a, b) => '${a.data()['nombre'] ?? a.id}'.compareTo('${b.data()['nombre'] ?? b.id}'));
+    final clasesPorGrupo = <String, int>{};
+    for (final c in [...?_clases?.docs]) {
+      final g = '${c.data()['grupoId']}';
+      clasesPorGrupo[g] = (clasesPorGrupo[g] ?? 0) + 1;
+    }
+
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('PaseLista'),
+          actions: [_MenuCuenta(usuario: widget.usuario), const SizedBox(width: 8)],
+          bottom: TabBar(
+            tabs: [
+              const Tab(text: 'Grupos'),
+              const Tab(text: 'Usuarios'),
+              Tab(
+                child: Badge(
+                  isLabelVisible: sinUsar > 0,
+                  label: Text('$sinUsar'),
+                  offset: const Offset(14, -6),
+                  child: const Text('Invitaciones'),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
-        Text('Usuarios', style: titulo),
-        ..._seccion(_usuarios, _errorUsuarios, 'Aún no hay usuarios.', [
-          for (final d in usuariosOrdenados) _filaUsuario(d),
-        ]),
-        const SizedBox(height: 16),
-        Text('Invitaciones', style: titulo),
-        ..._seccion(_invitaciones, _errorInvitaciones, 'Aún no hay invitaciones.', [
-          for (final d in [...?_invitaciones?.docs])
-            ListTile(
-              leading: Icon(
-                d.metadata.hasPendingWrites ? Icons.cloud_upload_outlined : Icons.mail_outline,
-              ),
-              title: Text(d.id),
-              subtitle: Text([
-                parseRol(d.data()['rol'])?.etiqueta ?? '${d.data()['rol']}',
-                if (conUsuario.contains(d.id)) 'en uso',
-                if (d.metadata.hasPendingWrites) 'pendiente de sincronizar',
-              ].join(' · ')),
-              // Sin la lista de usuarios no se sabe si está en uso: no se ofrece cancelar.
-              trailing: _usuarios == null || conUsuario.contains(d.id)
-                  ? null
-                  : IconButton(
-                      tooltip: 'Cancelar invitación',
-                      icon: const Icon(Icons.close),
-                      onPressed: () => _avisarSiFalla(
-                        cancelarInvitacion(d.id),
-                        'No se canceló la invitación de ${d.id}',
+        body: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: AvisoActualizacionTarjeta(),
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _pestana('grupos', [
+                    const BotonDatosPrueba(), // solo en depuración
+                    _boton(
+                      icono: Icons.upload_file,
+                      texto: 'Importar lista (CSV)',
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(builder: (_) => const ImportarCsv()),
                       ),
                     ),
+                    const _Ayuda('Toca un grupo para ver sus alumnos y darle de alta sus clases.'),
+                    ..._seccion(_grupos, _errorGrupos, 'Aún no hay grupos.', [
+                      for (final d in grupos) _filaGrupo(d, clasesPorGrupo[d.id]),
+                    ]),
+                  ]),
+                  _pestana('usuarios', [
+                    _boton(icono: Icons.person_add, texto: 'Invitar usuario', onPressed: _invitar),
+                    const _Ayuda('Quienes ya entraron a PaseLista. Quitar el acceso borra también su '
+                        'invitación.'),
+                    ..._seccion(_usuarios, _errorUsuarios, 'Aún no hay usuarios.', [
+                      for (final d in usuariosOrdenados) _filaUsuario(d),
+                    ]),
+                  ]),
+                  _pestana('invitaciones', [
+                    _boton(icono: Icons.person_add, texto: 'Invitar usuario', onPressed: _invitar),
+                    const _Ayuda('Correos que pueden entrar. "En uso" = esa persona ya entró y '
+                        'aparece en Usuarios.'),
+                    ..._seccion(_invitaciones, _errorInvitaciones, 'Aún no hay invitaciones.', [
+                      for (final d in invitaciones) _filaInvitacion(d, conUsuario),
+                    ]),
+                  ]),
+                ],
+              ),
             ),
-        ]),
-        const SizedBox(height: 16),
-        Text('Grupos', style: titulo),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const ImportarCsv()),
-            ),
-            icon: const Icon(Icons.upload_file),
-            label: const Text('Importar lista (CSV)'),
-          ),
+          ],
         ),
-        ..._seccion(_grupos, _errorGrupos, 'Aún no hay grupos.', [
-          for (final d in [...?_grupos?.docs]) _filaGrupo(d),
-        ]),
-      ],
+      ),
     );
   }
 
-  Widget _filaGrupo(QueryDocumentSnapshot<Map<String, dynamic>> d) {
+  void _invitar() => showDialog<void>(context: context, builder: (_) => const _DialogoInvitar());
+
+  /// Una pestaña: su propia lista, que recuerda hasta dónde bajaste al cambiar de pestaña.
+  Widget _pestana(String clave, List<Widget> children) => ListView(
+        key: PageStorageKey(clave),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: children,
+      );
+
+  Widget _boton({required IconData icono, required String texto, required VoidCallback onPressed}) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(onPressed: onPressed, icon: Icon(icono), label: Text(texto)),
+        ),
+      );
+
+  Widget _filaInvitacion(QueryDocumentSnapshot<Map<String, dynamic>> d, Set<String> conUsuario) {
+    final enUso = conUsuario.contains(d.id);
+    return ListTile(
+      leading: Icon(
+        d.metadata.hasPendingWrites
+            ? Icons.cloud_upload_outlined
+            : enUso
+                ? Icons.how_to_reg_outlined
+                : Icons.mail_outline,
+      ),
+      title: Text(d.id),
+      subtitle: Text([
+        parseRol(d.data()['rol'])?.etiqueta ?? '${d.data()['rol']}',
+        if (enUso) 'en uso' else if (_usuarios != null) 'aún no entra',
+        if (d.metadata.hasPendingWrites) 'pendiente de sincronizar',
+      ].join(' · ')),
+      // Sin la lista de usuarios no se sabe si está en uso: no se ofrece cancelar.
+      trailing: _usuarios == null || enUso
+          ? null
+          : IconButton(
+              tooltip: 'Cancelar invitación',
+              icon: const Icon(Icons.close),
+              onPressed: () => _avisarSiFalla(
+                cancelarInvitacion(d.id),
+                'No se canceló la invitación de ${d.id}',
+              ),
+            ),
+    );
+  }
+
+  /// [clases]: cuántas clases tiene dadas de alta; `null` si aún no se cargan.
+  Widget _filaGrupo(QueryDocumentSnapshot<Map<String, dynamic>> d, int? clases) {
     final alumnos = d.data()['alumnos'];
     final activos = alumnos is List
         ? alumnos.where((a) => a is Map && a['activo'] != false).length
@@ -173,6 +242,7 @@ class _AdminHomeState extends State<AdminHome> {
       title: Text(nombre),
       subtitle: Text([
         activos == 1 ? '1 alumno' : '$activos alumnos',
+        if (_clases != null) clases == 1 ? '1 clase' : '${clases ?? 0} clases',
         if (d.metadata.hasPendingWrites) 'pendiente de sincronizar',
       ].join(' · ')),
       trailing: MenuGrupo(grupoId: d.id, nombre: nombre),
@@ -253,6 +323,60 @@ class _AdminHomeState extends State<AdminHome> {
     escritura.catchError((Object e) {
       avisos.showSnackBar(SnackBar(content: Text('$mensaje: $e')));
     });
+  }
+}
+
+/// Texto de ayuda chico al principio de cada pestaña.
+class _Ayuda extends StatelessWidget {
+  const _Ayuda(this.texto);
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          texto,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+      );
+}
+
+/// Avatar en la barra de arriba: abre un menú con nombre, correo, rol y cerrar sesión.
+class _MenuCuenta extends StatelessWidget {
+  const _MenuCuenta({required this.usuario});
+  final Map<String, dynamic> usuario;
+
+  @override
+  Widget build(BuildContext context) {
+    final nombre = '${usuario['nombre'] ?? ''}';
+    return PopupMenuButton<void>(
+      tooltip: 'Tu cuenta',
+      itemBuilder: (_) => [
+        PopupMenuItem<void>(
+          enabled: false,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(nombre),
+            subtitle: Text([
+              '${usuario['email'] ?? ''}',
+              parseRol(usuario['rol'])?.etiqueta ?? '',
+            ].where((t) => t.isNotEmpty).join('\n')),
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<void>(
+          onTap: cerrarSesion,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.logout),
+            title: Text('Cerrar sesión'),
+          ),
+        ),
+      ],
+      child: Avatar(fotoUrl: usuario['fotoUrl'] as String?, nombre: nombre),
+    );
   }
 }
 
