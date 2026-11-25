@@ -38,6 +38,12 @@ void main() {
     expect(nombreMes('2026-12'), 'diciembre de 2026');
   });
 
+  test('encabezadoDia: día de la semana y día del mes', () {
+    expect(encabezadoDia('2026-11-03'), 'mar 03');
+    expect(encabezadoDia('2026-11-23'), 'lun 23');
+    expect(encabezadoDia('2026-11-29'), 'dom 29');
+  });
+
   test('nombreArchivo', () {
     expect(nombreArchivo('Prueba 3A · Matemáticas', ['2026-11'], 'xlsx'),
         'PaseLista - Prueba 3A - Matemáticas - 2026-11.xlsx');

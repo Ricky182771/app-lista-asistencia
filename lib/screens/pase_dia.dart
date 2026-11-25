@@ -160,80 +160,93 @@ class _PaseDiaState extends State<PaseDia> {
       estado = doc!.metadata.hasPendingWrites ? 'Pendiente de enviar' : 'Enviado';
     }
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final compacto = esCompacto(context);
+    final denso = compacto ? VisualDensity.compact : null;
+    final encabezado = Padding(
+      padding: EdgeInsets.fromLTRB(16, compacto ? 8 : 12, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: compacto ? 8 : 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _elegirFecha,
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(_fecha),
-                  ),
-                  Chip(
-                    avatar: Icon(
-                      pase == null
-                          ? Icons.edit_note
-                          : doc!.metadata.hasPendingWrites
-                              ? Icons.cloud_upload_outlined
-                              : Icons.cloud_done_outlined,
-                    ),
-                    label: Text(estado),
-                  ),
-                  if (!editable && pase != null) const Chip(label: Text('Solo lectura')),
-                ],
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(visualDensity: denso),
+                onPressed: _elegirFecha,
+                icon: const Icon(Icons.calendar_today, size: 18),
+                label: Text(_fecha),
               ),
-              const SizedBox(height: 12),
-              if (pase == null && editable)
-                SizedBox(
-                  width: 200,
-                  child: TextField(
-                    controller: _salon,
-                    decoration: const InputDecoration(
-                      labelText: 'Salón',
-                      helperText: 'Después de enviar ya no se puede cambiar',
-                    ),
-                  ),
-                )
-              else if (pase != null)
-                Text('Salón: ${pase['salon']}'),
-              // Sin conexión y sin caché no se sabe si ya hay un pase de este día en otro dispositivo.
-              if (pase == null && editable && snap.metadata.isFromCache)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Sin conexión: si ya pasaste lista de este día en otro dispositivo, '
-                    'espera a tener internet antes de enviar.',
-                  ),
+              Chip(
+                visualDensity: denso,
+                avatar: Icon(
+                  pase == null
+                      ? Icons.edit_note
+                      : doc!.metadata.hasPendingWrites
+                          ? Icons.cloud_upload_outlined
+                          : Icons.cloud_done_outlined,
                 ),
-              const SizedBox(height: 12),
-              const LeyendaEstados(),
+                label: Text(estado),
+              ),
+              if (!editable && pase != null) Chip(visualDensity: denso, label: const Text('Solo lectura')),
             ],
           ),
-        ),
-        const Divider(),
-        Expanded(
-          child: filas.isEmpty
-              ? const Center(child: Text('Este grupo no tiene alumnos activos.'))
-              : ListView(
-                  children: [
-                    if (pase != null || editable)
-                      for (final f in filas) _fila(f, guardados, editable),
-                  ],
+          SizedBox(height: compacto ? 4 : 12),
+          if (pase == null && editable)
+            SizedBox(
+              width: 260,
+              child: TextField(
+                controller: _salon,
+                decoration: InputDecoration(
+                  labelText: 'Salón',
+                  isDense: compacto,
+                  helperText: 'Después de enviar ya no se puede cambiar',
+                  helperMaxLines: 2,
                 ),
+              ),
+            )
+          else if (pase != null)
+            Text('Salón: ${pase['salon']}'),
+          // Sin conexión y sin caché no se sabe si ya hay un pase de este día en otro dispositivo.
+          if (pase == null && editable && snap.metadata.isFromCache)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Sin conexión: si ya pasaste lista de este día en otro dispositivo, '
+                'espera a tener internet antes de enviar.',
+              ),
+            ),
+          SizedBox(height: compacto ? 8 : 12),
+          LeyendaEstados(compacta: compacto),
+        ],
+      ),
+    );
+
+    // El encabezado va dentro de la lista: en el teléfono se va con el scroll y deja toda la pantalla
+    // para los alumnos. El botón de abajo sí queda fijo.
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            children: [
+              encabezado,
+              const Divider(),
+              if (filas.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: Text('Este grupo no tiene alumnos activos.')),
+                )
+              else if (pase != null || editable)
+                for (final f in filas) _fila(f, guardados, editable, compacto),
+            ],
+          ),
         ),
         if (editable && filas.isNotEmpty)
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: compacto ? const EdgeInsets.fromLTRB(16, 8, 16, 12) : const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
                 child: pase == null
@@ -254,11 +267,21 @@ class _PaseDiaState extends State<PaseDia> {
     );
   }
 
-  Widget _fila(Fila f, Map<String, dynamic> guardados, bool editable) {
+  /// [compacto]: letra un poco más chica y menos margen, para que la mayoría de los nombres quepan en
+  /// una línea en el teléfono. La fila conserva su alto mínimo de 48 para tocarla con el dedo.
+  Widget _fila(Fila f, Map<String, dynamic> guardados, bool editable, bool compacto) {
     final actual = _cambios[f.nl] ?? (guardados[f.nl] as num?)?.toInt();
+    final texto = Theme.of(context).textTheme;
     return ListTile(
-      leading: SizedBox(width: 32, child: Text(f.nl, textAlign: TextAlign.end)),
-      title: Text(f.nombre),
+      visualDensity: compacto ? VisualDensity.compact : null,
+      contentPadding: compacto ? const EdgeInsets.symmetric(horizontal: 12) : null,
+      minLeadingWidth: compacto ? 24 : null,
+      horizontalTitleGap: compacto ? 10 : null,
+      leading: SizedBox(
+        width: compacto ? 24 : 32,
+        child: Text(f.nl, textAlign: TextAlign.end, style: compacto ? texto.bodySmall : null),
+      ),
+      title: Text(f.nombre, style: compacto ? texto.bodyMedium : null),
       subtitle: f.baja ? const Text('Dado de baja') : null,
       trailing: CeldaEstado(estado: actual),
       // Un alumno sin registro en un pase ya enviado empieza en presente al tocarlo.

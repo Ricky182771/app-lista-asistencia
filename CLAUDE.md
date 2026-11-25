@@ -110,8 +110,13 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   **Riesgo que queda:** si un profe desmarca la casilla en una computadora compartida, la siguiente carga
   de la página usa caché en disco, y los datos del siguiente profe pueden quedar en IndexedDB hasta la
   carga siguiente, cuando `configurarWeb()` los borra (porque ese profe entró con la casilla marcada).
+- **Teléfono (menos de 600 px de ancho, `esCompacto`):** la vista por día y la mensual usan su versión
+  compacta. En la del día, el encabezado (fecha, estado, salón y leyenda) va dentro de la lista y se va
+  con el scroll; el botón Enviar/Guardar queda fijo. Leyenda con cuadros chicos y "Justificada" en vez de
+  "Falta justificada". En la mensual, columnas de 60 px con cabecera "lun 23" (`encabezadoDia`, la fecha
+  completa en el tooltip) y nombres en letra chica en hasta dos líneas. Las filas conservan 48 px de alto.
 - **Vista mensual del profe:** una columna por cada día que tiene pase (no se guarda horario), cabecera
-  con la fecha `AAAA-MM-DD`. Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
+  con la fecha `AAAA-MM-DD` (en el teléfono, "lun 23"). Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
   Las columnas de hace más de 28 días son de solo lectura. La columna Nombre se ensancha arrastrando su
   borde (doble clic la regresa al ancho automático; `anchoNombre()` la limita al 75 % de la pantalla). En
   web el ancho se guarda en `localStorage` (`paselista.anchoNombre`); en Android dura mientras la app esté
