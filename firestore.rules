@@ -7,6 +7,8 @@ service cloud.firestore {
     function correo() { return request.auth.token.email.lower(); }
     function inv() { return /databases/$(db)/documents/invitaciones/$(correo()); }
     function clase(id) { return get(/databases/$(db)/documents/clases/$(id)).data; }
+    // Con sesión y ya dado de alta (tiene usuarios/{uid}), con cualquier rol.
+    function registrado() { return signedIn() && exists(/databases/$(db)/documents/usuarios/$(request.auth.uid)); }
     // fecha = "AAAA-MM-DD"
     function fechaTs(fecha) {
       let p = fecha.split('-');
@@ -50,6 +52,13 @@ service cloud.firestore {
     match /clases/{cid} {
       allow read: if isRole('admin') || isRole('orden')
         || (isRole('profesor') && resource.data.profesorUid == request.auth.uid);
+      allow write: if isRole('admin');
+    }
+
+    // config/app: la versión publicada del APK para el aviso de actualización. La lee la app de
+    // cualquier usuario dado de alta; solo el admin la cambia (por ahora desde la consola de Firebase).
+    match /config/{id} {
+      allow read: if registrado();
       allow write: if isRole('admin');
     }
 

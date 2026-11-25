@@ -98,6 +98,7 @@ firestore.rules          Reglas de seguridad por rol
 firestore.indexes.json   Índices compuestos (vista mensual)
 firebase.json            Hosting (build/web) y emuladores
 scripts/bootstrap.sh     Genera el esqueleto de Flutter (solo se corrió una vez)
+scripts/publicar-apk.sh  Publica el APK en GitHub Releases (ver "Publicar una versión")
 test/fixtures/csv/       CSV de prueba inventados
 lib/                     Código de la app (se genera en el hito 0)
 ```
@@ -112,3 +113,25 @@ firebase emulators:start                             # probar reglas y login sin
 firebase deploy --only firestore:rules,firestore:indexes
 flutter build web && firebase deploy --only hosting
 ```
+
+## Publicar una versión (solo Ricardo)
+
+La web se actualiza sola con `firebase deploy --only hosting`. El APK se reparte por GitHub Releases con
+un enlace fijo que siempre apunta a la última versión (es el que va en el manual y en el QR):
+
+```
+https://github.com/Ricky182771/app-lista-asistencia/releases/latest/download/PaseLista.apk
+```
+
+1. En un PR, sube la versión en `pubspec.yaml`: `1.1.0+2` → `1.1.1+3`. El número después del `+` es el
+   `versionCode` de Android y **siempre** tiene que crecer; si no, el APK no se instala encima.
+2. Ya fusionado, desde `main` actualizado: `scripts/publicar-apk.sh "Qué cambia"`. Revisa que exista
+   `android/key.properties`: el APK se firma **siempre con la misma llave** (respáldala; si se pierde,
+   todos tendrían que desinstalar y volver a instalar).
+3. En la consola de Firebase, Firestore → `config/app`, pon los valores que imprime el script. A partir de
+   ahí, cada APK viejo muestra "Ya está disponible PaseLista x.y.z" con el botón Descargar.
+4. Solo si la versión anterior ya no debe usarse (por ejemplo, un cambio de reglas que la rompe), sube
+   también `buildMinimo` al `buildActual` nuevo: los APK más viejos quedan bloqueados en la pantalla
+   "Actualiza la app" hasta instalar la nueva. Úsalo poco: un profe sin datos en el celular no podría
+   pasar lista hasta conseguir internet (le queda la web).
+

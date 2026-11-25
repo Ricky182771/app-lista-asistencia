@@ -27,6 +27,7 @@ npm --prefix test/rules install    # una vez: dependencias de las pruebas de reg
 firebase emulators:exec --only firestore "npm --prefix test/rules test"   # pruebas de firestore.rules
 firebase deploy --only firestore:rules,firestore:indexes
 flutter build apk --release
+scripts/publicar-apk.sh "Notas"    # desde main: sube el APK a GitHub Releases (ver README)
 flutter build web && firebase deploy --only hosting
 ```
 
@@ -54,6 +55,7 @@ clases/{id generado}         profesorUid, profesorNombre, grupoId, materia, salo
 pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el real de ese día),
                              fecha "AAAA-MM-DD", marcadoEn, enviadoEn, editadoEn,
                              estados: { "<N.L>": 0 | 1 | 2 }
+config/app                   versionActual, buildActual, buildMinimo (opcional), urlApk
 ```
 
 - **Estados de asistencia:** `0` presente, `1` falta, `2` falta justificada (sin motivo, solo la marca).
@@ -137,6 +139,15 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   "Vista mensual de…" y la vista mensual en solo consulta muestran "Prof. Nombre · Salón A7"
   (`profeYSalon`). En el detalle del grupo el salón es el real del pase; en la vista mensual, el de siempre
   de la clase. El .xlsx exportado lleva lo mismo en el título de cada hoja (el nombre del archivo no).
+- **Actualizaciones del APK:** el APK se publica en GitHub Releases como `PaseLista.apk` con
+  `scripts/publicar-apk.sh` (ver README, "Publicar una versión"). `config/app` dice cuál es la última:
+  si el `+N` de `pubspec.yaml` de este APK es menor que `buildActual`, cada inicio muestra la tarjeta
+  "Ya está disponible…" (`AvisoActualizacionTarjeta`); si es menor que `buildMinimo`,
+  `PuertaActualizacion` (alrededor del inicio de cada rol en `main.dart`) muestra "Actualiza la app" en
+  vez del inicio. Solo en Android: la web siempre es la desplegada. Si `config/app` no existe, viene mal
+  (`avisoActualizacion` exige `buildActual` numérico y `urlApk` https) o no se puede leer, no avisa ni
+  bloquea. Lo lee cualquier usuario dado de alta (`registrado()` en las reglas); solo el admin lo escribe,
+  por ahora desde la consola de Firebase.
 - **Mensaje para padres:** uno por grupo al día, a partir del **pase de la mañana** (el primero del día
   según `marcadoEn`). Lista solo nombres con falta sin justificar (`1`), sin materia. La app no se
   conecta a WhatsApp: genera el texto y lo copia al portapapeles.
