@@ -334,6 +334,65 @@ describe('pases', () => {
   });
 });
 
+describe('reasignar una clase a otro profe', () => {
+  /** Lo mismo que hace `reasignarClase`: la clase, el grupo y los pases, en un solo batch. */
+  const reasignar = (db, pasesIds, nuevo = 'profe2', destinoPases = nuevo) => {
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'clases/profe_g1'), { profesorUid: nuevo, profesorNombre: 'Otro' });
+    lote.update(doc(db, 'grupos/g1'), { profesores: ['profe', nuevo] });
+    for (const id of pasesIds) lote.update(doc(db, `pases/${id}`), { profesorUid: destinoPases });
+    return lote.commit();
+  };
+  const PASE = `profe_g1_${HACE_5}`;
+
+  test('el admin pasa la clase y sus pases al profe nuevo, que los ve; el anterior ya no', async () => {
+    await assertSucceeds(reasignar(como('admin'), [PASE]));
+    await assertSucceeds(getDoc(doc(como('profe2'), `pases/${PASE}`)));
+    await assertFails(getDoc(doc(como('profe'), `pases/${PASE}`)));
+    // y el profe nuevo ya puede corregir el pase (es suyo y está dentro de los 28 días)
+    await assertSucceeds(updateDoc(doc(como('profe2'), `pases/${PASE}`),
+      { 'estados.3': 2, editadoEn: serverTimestamp() }));
+  });
+
+  test('los pases solo pueden ir al profe que la clase tiene al terminar el batch', async () => {
+    // la clase pasa a profe2 pero el pase se manda a otra persona
+    await assertFails(reasignar(como('admin'), [PASE], 'profe2', 'orden'));
+    // el pase cambia de dueño sin que cambie la clase
+    await assertFails(updateDoc(doc(como('admin'), `pases/${PASE}`), { profesorUid: 'profe2' }));
+  });
+
+  test('un rezagado se puede mover después de reasignar la clase (reintento)', async () => {
+    await assertSucceeds(reasignar(como('admin'), []));
+    await assertSucceeds(updateDoc(doc(como('admin'), `pases/${PASE}`), { profesorUid: 'profe2' }));
+  });
+
+  test('el admin no cambia nada más de un pase', async () => {
+    const ref = doc(como('admin'), `pases/${PASE}`);
+    await assertFails(updateDoc(ref, { 'estados.1': 1 }));
+    await assertFails(updateDoc(ref, { salon: 'Z9' }));
+    await assertFails(updateDoc(ref, { claseId: 'profe2_g2' }));
+    await assertFails(updateDoc(ref, { profesorUid: 'profe', grupoId: 'g2' }));
+  });
+
+  test('profe y orden no reasignan', async () => {
+    await assertFails(reasignar(como('profe'), [PASE]));
+    await assertFails(reasignar(como('profe2'), [PASE]));
+    await assertFails(reasignar(como('orden'), [PASE]));
+  });
+
+  test('un batch de 395 pases de la misma clase cabe en los límites de las reglas', async () => {
+    const ids = [];
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (let i = 0; i < 395; i++) {
+        ids.push(`profe_g1_masivo${i}`);
+        await setDoc(doc(db, `pases/profe_g1_masivo${i}`), pase('profe_g1', 'g1', 'profe', fecha(-i % 28)));
+      }
+    });
+    await assertSucceeds(reasignar(como('admin'), ids));
+  });
+});
+
 describe('config', () => {
   const config = { versionActual: '1.1.0', buildActual: 2, urlApk: 'https://ejemplo.com/PaseLista.apk' };
 

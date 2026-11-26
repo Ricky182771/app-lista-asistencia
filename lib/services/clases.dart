@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/clase.dart';
+import '../models/grupo.dart' show enLotes;
 
 final _db = FirebaseFirestore.instance;
 
@@ -25,6 +26,26 @@ Future<void> darDeAltaClase(Clase clase) => (_db.batch()
         'profesores': FieldValue.arrayUnion([clase.profesorUid]),
       }))
     .commit();
+
+/// Da de alta varias clases a la vez (Herramientas avanzadas), cada una con su ID nuevo y agregando
+/// al profe a `grupos.profesores` en el mismo `WriteBatch`, como [darDeAltaClase]. Cada clase son dos
+/// escrituras, así que van en lotes de 200 (límite de un `WriteBatch`: 500). Devuelve un Future por
+/// lote; sin `await` a propósito (ver [darDeAltaClase]). Quien llama revisa antes con `validarClases`.
+List<Future<void>> darDeAltaClases(List<Clase> clases) {
+  final lotes = <Future<void>>[];
+  for (final lote in enLotes(clases, 200)) {
+    final batch = _db.batch();
+    for (final c in lote) {
+      batch
+        ..set(_db.collection('clases').doc(), c.toMap())
+        ..update(_db.doc('grupos/${c.grupoId}'), {
+          'profesores': FieldValue.arrayUnion([c.profesorUid]),
+        });
+    }
+    lotes.add(batch.commit());
+  }
+  return lotes;
+}
 
 /// Corrige la materia y el salón; el ID, el profe y el grupo no cambian, así que los pases siguen
 /// ligados a la clase. Sin `await` a propósito (ver [darDeAltaClase]).
@@ -58,4 +79,75 @@ Future<void> borrarClase(Clase clase, {required bool quitarProfe}) {
     });
   }
   return batch.commit();
+}
+
+const _servidor = GetOptions(source: Source.server);
+
+/// Pasa la clase a otro profe. A diferencia del resto, **espera con `await` y pide internet**: lee del
+/// servidor las clases del grupo y los pases de la clase, y repasa que no quede ninguno a nombre del
+/// profe anterior.
+///
+/// En el primer `WriteBatch` van la clase (profe nuevo, su nombre, materia y salón), `grupos.profesores`
+/// (entra el nuevo; sale el anterior si ya no le queda otra clase con ese grupo) y los primeros pases;
+/// el resto de los pases, en lotes de 400 después. Los pases ya hechos pasan al profe nuevo (cambia su
+/// `profesorUid`) para que vea todo el historial de la clase y pueda corregir el pase de hoy si el
+/// anterior ya lo había hecho; las reglas solo dejan al admin cambiar ese campo, y solo al profe que
+/// la clase tiene al terminar el batch. Si algo falla a medio camino, volver a llamarla termina el
+/// trabajo: lee el estado actual del servidor y solo mueve los pases que aún no son del profe nuevo.
+/// [progreso] recibe (hechos, total) después de cada lote.
+Future<void> reasignarClase({
+  required Clase clase,
+  required String profesorUid,
+  required String profesorNombre,
+  void Function(int hechos, int total)? progreso,
+}) async {
+  final claseRef = _db.doc('clases/${clase.id}');
+  final actual = await claseRef.get(_servidor);
+  if (!actual.exists) throw StateError('La clase ya no existe.');
+  final anterior = '${actual.data()?['profesorUid']}';
+  final delGrupo = await _db.collection('clases').where('grupoId', isEqualTo: clase.grupoId).get(_servidor);
+  final pases = await _db.collection('pases').where('claseId', isEqualTo: clase.id).get(_servidor);
+
+  final quitarAnterior = anterior != profesorUid &&
+      !delGrupo.docs.any((d) => d.id != clase.id && d.data()['profesorUid'] == anterior);
+  final porMover = [
+    for (final d in pases.docs)
+      if (d.data()['profesorUid'] != profesorUid) d.reference,
+  ];
+  // La clase, el grupo y hasta 395 pases en el primer lote (4 escrituras de la clase y el grupo).
+  final primeros = porMover.take(395).toList();
+  final resto = porMover.skip(395).toList();
+  final total = 1 + porMover.length;
+
+  final primer = _db.batch()
+    ..update(claseRef, {
+      'profesorUid': profesorUid,
+      'profesorNombre': profesorNombre,
+      'materia': clase.materia,
+      'salon': clase.salon,
+    })
+    ..update(_db.doc('grupos/${clase.grupoId}'), {
+      'profesores': FieldValue.arrayUnion([profesorUid]),
+    });
+  if (quitarAnterior) {
+    primer.update(_db.doc('grupos/${clase.grupoId}'), {
+      'profesores': FieldValue.arrayRemove([anterior]),
+    });
+  }
+  for (final ref in primeros) {
+    primer.update(ref, {'profesorUid': profesorUid});
+  }
+  await primer.commit();
+  var hechos = 1 + primeros.length;
+  progreso?.call(hechos, total);
+
+  for (final lote in enLotes(resto, 400)) {
+    final batch = _db.batch();
+    for (final ref in lote) {
+      batch.update(ref, {'profesorUid': profesorUid});
+    }
+    await batch.commit();
+    hechos += lote.length;
+    progreso?.call(hechos, total);
+  }
 }

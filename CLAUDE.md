@@ -84,6 +84,15 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   falla a medio camino, sigue en la lista y se reintenta. Después de borrar las clases ya no entra ningún
   pase atrasado (las reglas piden que la clase exista), y un repaso final borra los que llegaron mientras
   tanto. Se confirma escribiendo el nombre del grupo (`confirmaNombre`). No se puede deshacer.
+- **Reasignar una clase a otro profe** (`reasignarClase`, al editar la clase en la pantalla del grupo y
+  cambiar el profesor): como el borrado de grupo, **espera con `await` y pide internet**, porque lee del
+  servidor (`Source.server`) las clases del grupo y los pases de la clase. Un `WriteBatch` actualiza la
+  clase (profe, `profesorNombre`, materia, salón), `grupos.profesores` (entra el nuevo; sale el anterior
+  si ya no le queda otra clase con ese grupo) y los primeros 395 pases (`profesorUid`); el resto, en lotes
+  de 400. Los pases ya hechos pasan al profe nuevo para que vea todo el historial. **Reglas:** el admin
+  puede hacer `update()` de un pase solo si cambia únicamente `profesorUid` y es el que la clase tiene al
+  terminar el batch (`getAfter`). Reintentar es seguro: solo mueve los pases que aún no son del profe
+  nuevo. **Hay que desplegar las reglas antes de usar la app nueva.**
 - **Quitar acceso** = borrar `usuarios/{uid}` + `invitaciones/{correo}` en el mismo `WriteBatch`. Si
   solo se borra el usuario, la invitación sigue y la persona se da de alta sola al volver a entrar.
 - **Cambiar rol** (`cambiarRol`, menú ⋮ del usuario) actualiza `usuarios/{uid}.rol` y `invitaciones/{correo}.rol`
@@ -127,6 +136,24 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   borde (doble clic la regresa al ancho automático; `anchoNombre()` la limita al 75 % de la pantalla). En
   web el ancho se guarda en `localStorage` (`paselista.anchoNombre`); en Android dura mientras la app esté
   abierta.
+- **Herramientas avanzadas (admin):** pantalla aparte (ícono 🔧 de la barra del inicio del admin,
+  `HerramientasAvanzadas`) con tres herramientas por lote que leen un CSV, lo convierten en filas
+  editables y **no guardan nada hasta revisar la vista previa**. Lógica pura en `lib/models/lote_*.dart`
+  (con pruebas), pantallas en `lib/screens/lote_*.dart`, piezas comunes en `lote_comun.dart`. Cada fila
+  queda **lista**, **con aviso** (se guarda: posible duplicado, errata en el correo…), **con error** (hay
+  que corregirla con el lápiz o quitarla con la ✕; bloquea el guardado) u **omitida** (ya existe; en gris).
+  El encabezado del CSV es opcional y las columnas pueden ir en otro orden si lo traen (`leerConColumnas`).
+  - **Invitar varios usuarios** (`correo,rol`): valida correos, repetidos, errata de dominio
+    (`sugerirCorreo`) y quien ya tiene acceso o invitación. Escribe `invitaciones/{correo}` en lotes de 400.
+  - **Importar grupos por lote** (`grupo,N.L,nombre`): un solo archivo con varios grupos. Reglas de
+    alumnos como en el importador normal; un grupo que ya existe (por nombre **o** por ID, ver "Renombrar
+    grupo") se omite o, si el admin lo pide, se actualiza con `compararListas` (las bajas no se borran).
+  - **Dar de alta clases por lote** (`profesor,grupo,materia,salón`): el profe va por correo (o por nombre
+    si es único) y debe ser `profesor` y haber entrado ya; el grupo debe existir. Misma regla de
+    `materiaRepetida`; una repetida en el archivo con el mismo salón se omite y con otro salón es error.
+    Cada clase son dos escrituras (clase + `grupos.profesores`), así que van en lotes de 200.
+  Como el resto, **no esperan con `await`** (`avisarSiFallan` avisa si falla algún lote; reintentar es
+  seguro porque lo que ya existe se omite).
 - **Resumen del día (admin):** primera pestaña del inicio del admin (`ResumenDia`, lógica en
   `lib/models/resumen_dia.dart`). Une todas las clases con los pases de un día (hoy por omisión, con
   selector de fecha): "X de Y clases con pase", faltas del día, profes con clases y ningún pase, y la

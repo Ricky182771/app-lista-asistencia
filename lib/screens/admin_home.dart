@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/clase.dart' show claseDe, nombresDesactualizados;
+import '../models/lote_usuarios.dart' show correoValido;
 import '../models/rol.dart';
 import '../models/usuarios.dart';
 import '../services/clases.dart' show ponerNombresDeProfes;
@@ -15,6 +16,7 @@ import 'acciones_grupo.dart';
 import 'aviso_actualizacion.dart';
 import 'datos_prueba.dart';
 import 'editar_grupo.dart';
+import 'herramientas_avanzadas.dart';
 import 'importar_csv.dart';
 import 'inicio.dart';
 import 'resumen_dia.dart';
@@ -137,7 +139,18 @@ class _AdminHomeState extends State<AdminHome> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('PaseLista'),
-          actions: [_MenuCuenta(usuario: widget.usuario), const SizedBox(width: 8)],
+          actions: [
+            IconButton(
+              tooltip: 'Herramientas avanzadas',
+              icon: const Icon(Icons.construction_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => const HerramientasAvanzadas()),
+              ),
+            ),
+            _MenuCuenta(usuario: widget.usuario),
+            const SizedBox(width: 8),
+          ],
           bottom: TabBar(
             tabs: [
               const Tab(text: 'Resumen'),
@@ -668,7 +681,7 @@ class _DialogoInvitarState extends State<_DialogoInvitar> {
 
   void _guardar() {
     final correo = normalizarCorreo(_correo.text);
-    if (!RegExp(r'^[^@\s/]+@[^@\s/]+\.[^@\s/]+$').hasMatch(correo)) {
+    if (!correoValido(correo)) {
       setState(() => _error = 'Escribe un correo válido.');
       return;
     }

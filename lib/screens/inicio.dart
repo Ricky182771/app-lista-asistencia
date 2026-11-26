@@ -64,3 +64,24 @@ void avisarSiFalla(BuildContext context, Future<void> escritura, String mensaje)
     avisos.showSnackBar(SnackBar(content: Text('$mensaje: $e')));
   });
 }
+
+/// Igual que [avisarSiFalla], para escrituras por lote (varios `WriteBatch`): avisa una sola vez
+/// cuántos lotes fallaron, aunque hayan sido varios. Los lotes que sí se guardaron no se deshacen.
+void avisarSiFallan(BuildContext context, List<Future<void>> escrituras, String mensaje) {
+  final avisos = ScaffoldMessenger.of(context);
+  Object? primero;
+  var fallaron = 0;
+  Future.wait([
+    for (final e in escrituras)
+      e.catchError((Object error) {
+        fallaron++;
+        primero ??= error;
+      }),
+  ]).then((_) {
+    if (fallaron == 0) return;
+    avisos.showSnackBar(SnackBar(
+      content: Text('$mensaje ($fallaron de ${escrituras.length} lotes): $primero. '
+          'Revisa la lista y vuelve a intentarlo: lo que ya existe se omite.'),
+    ));
+  });
+}
