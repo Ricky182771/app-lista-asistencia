@@ -264,7 +264,7 @@ class _ImportarCsvState extends State<ImportarCsv> {
 
 /// Zona para soltar el archivo (web) o tocarla y elegirlo (web y Android).
 class ZonaArchivo extends StatelessWidget {
-  const ZonaArchivo({required this.resaltada, required this.archivo, required this.alTocar});
+  const ZonaArchivo({super.key, required this.resaltada, required this.archivo, required this.alTocar});
   final bool resaltada;
   final String? archivo;
   final VoidCallback alTocar;
