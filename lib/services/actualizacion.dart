@@ -21,3 +21,15 @@ Stream<AvisoActualizacion?> escucharActualizacion() async* {
 
 /// Abre el enlace del APK en el navegador, que lo descarga; Android pregunta si se instala.
 Future<bool> abrirDescarga(Uri url) => launchUrl(url, mode: LaunchMode.externalApplication);
+
+/// `config/app` en vivo, para el formulario del admin (Herramientas avanzadas → Versión de la app).
+Stream<DocumentSnapshot<Map<String, dynamic>>> configApp() =>
+    FirebaseFirestore.instance.doc('config/app').snapshots(includeMetadataChanges: true);
+
+/// Guarda `config/app` con `merge`: no pisa otros campos que alguien haya puesto en la consola. Un
+/// valor `null` borra el campo (así se quita `buildMinimo`). Sin `await` a propósito, como el resto
+/// de las escrituras del admin (ver CLAUDE.md); solo el admin puede escribir (reglas).
+Future<void> guardarConfigApp(Map<String, Object?> datos) => FirebaseFirestore.instance.doc('config/app').set(
+      {for (final e in datos.entries) e.key: e.value ?? FieldValue.delete()},
+      SetOptions(merge: true),
+    );

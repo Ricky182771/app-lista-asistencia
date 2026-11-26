@@ -154,7 +154,7 @@ class _PaseMensualState extends State<PaseMensual> {
 
       final eleccion = await showDialog<({Set<String> meses, bool xlsx})>(
         context: context,
-        builder: (_) => _DialogoExportar(diasPorMes: dias),
+        builder: (_) => DialogoExportar(diasPorMes: dias),
       );
       if (eleccion == null) return;
 
@@ -467,17 +467,20 @@ class _PaseMensualState extends State<PaseMensual> {
 }
 
 /// Elegir formato y meses. Devuelve `(meses: {"AAAA-MM", ...}, xlsx: true|false)` o `null` si se cancela.
-class _DialogoExportar extends StatefulWidget {
-  const _DialogoExportar({required this.diasPorMes});
+class DialogoExportar extends StatefulWidget {
+  const DialogoExportar({super.key, required this.diasPorMes, this.delGrupo = false});
 
   /// "AAAA-MM" → días con pase, en orden.
   final Map<String, int> diasPorMes;
 
+  /// Exportar todas las clases de un grupo (una tabla con totales por clase) en vez de una sola clase.
+  final bool delGrupo;
+
   @override
-  State<_DialogoExportar> createState() => _DialogoExportarState();
+  State<DialogoExportar> createState() => _DialogoExportarState();
 }
 
-class _DialogoExportarState extends State<_DialogoExportar> {
+class _DialogoExportarState extends State<DialogoExportar> {
   late final Set<String> _meses = {...widget.diasPorMes.keys};
   bool _xlsx = true;
 
@@ -486,7 +489,7 @@ class _DialogoExportarState extends State<_DialogoExportar> {
     final todos = _meses.length == widget.diasPorMes.length;
     final chico = Theme.of(context).textTheme.bodySmall;
     return AlertDialog(
-      title: const Text('Exportar registro'),
+      title: Text(widget.delGrupo ? 'Exportar asistencia del grupo' : 'Exportar registro'),
       content: SizedBox(
         width: 420,
         child: Column(
@@ -503,11 +506,15 @@ class _DialogoExportarState extends State<_DialogoExportar> {
             ),
             const SizedBox(height: 8),
             Text(
-              _xlsx
-                  ? 'Una hoja por mes con los colores de la app, totales y % de asistencia. '
-                      'Con varios meses, también una hoja de resumen.'
-                  : 'Una sola tabla sin formato: P, F o J por fecha y los totales. Para abrir en '
-                      'cualquier programa o importar a otro sistema.',
+              widget.delGrupo
+                  ? 'Una fila por alumno con las asistencias, faltas y justificadas de cada clase y los '
+                      'totales del grupo con su % de asistencia. Para el detalle día por día, exporta '
+                      'la clase desde su vista mensual.'
+                  : _xlsx
+                      ? 'Una hoja por mes con los colores de la app, totales y % de asistencia. '
+                          'Con varios meses, también una hoja de resumen.'
+                      : 'Una sola tabla sin formato: P, F o J por fecha y los totales. Para abrir en '
+                          'cualquier programa o importar a otro sistema.',
               style: chico,
             ),
             const SizedBox(height: 16),

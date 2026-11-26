@@ -1,11 +1,16 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../models/clase.dart';
+import '../models/exportar.dart';
 import '../models/grupo.dart';
+import '../models/xlsx.dart' show mimeXlsx;
 import '../services/clases.dart';
+import '../services/pases.dart' show pasesDelGrupo;
 import 'inicio.dart';
 import 'lote_comun.dart' show confirmarLote;
 import 'pase_mensual.dart';
@@ -88,6 +93,74 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
       avisarSiFalla(context, darDeAltaClase(clase), 'No se dio de alta la clase de ${clase.materia}');
     } else {
       avisarSiFalla(context, editarClase(clase), 'No se guardaron los cambios de la clase de ${clase.materia}');
+    }
+  }
+
+  bool _exportando = false;
+
+  /// Lee los pases de todas las clases del grupo, pregunta meses y formato, arma una sola tabla con los
+  /// totales de cada alumno por clase y la guarda: en web se descarga y en Android se abre "Guardar como".
+  /// Las clases que ya se borraron no entran (sus pases se conservan, pero ya no tienen materia).
+  Future<void> _exportar() async {
+    final avisos = ScaffoldMessenger.of(context);
+    void avisar(String m) => avisos.showSnackBar(SnackBar(content: Text(m)));
+    setState(() => _exportando = true);
+    try {
+      final snap = await pasesDelGrupo(widget.grupoId);
+      final nombres = _nombres;
+      final porClase = <String, Map<String, Map<String, dynamic>>>{};
+      for (final d in snap.docs) {
+        (porClase['${d.data()['claseId']}'] ??= {})['${d.data()['fecha']}'] =
+            Map<String, dynamic>.from(d.data()['estados'] as Map? ?? const {});
+      }
+      final delGrupo = <ClaseDelGrupo>[
+        for (final c in _lista)
+          (
+            materia: c.materia,
+            profesor: nombres[c.profesorUid] ?? c.profesorNombre,
+            salon: c.salon,
+            pases: porClase[c.id] ?? const {},
+          ),
+      ];
+      final dias = diasPorMes([for (final c in delGrupo) ...c.pases.keys]);
+      if (!mounted) return;
+      if (dias.isEmpty) {
+        avisar('Este grupo todavía no tiene pases para exportar.');
+        return;
+      }
+      final eleccion = await showDialog<({Set<String> meses, bool xlsx})>(
+        context: context,
+        builder: (_) => DialogoExportar(diasPorMes: dias, delGrupo: true),
+      );
+      if (eleccion == null) return;
+
+      final registro = RegistroGrupo(
+        titulo: '${widget.nombreGrupo} · Grupo completo',
+        alumnos: (widget.grupo.data()?['alumnos'] as List?) ?? const [],
+        delGrupo: delGrupo,
+        meses: eleccion.meses,
+      );
+      if (registro.clases.isEmpty) {
+        avisar('No hay pases en los meses elegidos.');
+        return;
+      }
+      final nombre = nombreArchivo(registro.titulo, registro.meses, eleccion.xlsx ? 'xlsx' : 'csv');
+      final uri = await FilePicker.saveFile(
+        fileName: nombre,
+        bytes: eleccion.xlsx ? xlsxGrupo(registro) : csvGrupoBytes(registro),
+        mimeType: eleccion.xlsx ? mimeXlsx : 'text/csv',
+        dialogTitle: 'Guardar asistencia del grupo',
+      );
+      // En web la descarga siempre devuelve null; en Android null = canceló.
+      if (kIsWeb) {
+        avisar('Se descargó $nombre');
+      } else if (uri != null) {
+        avisar('Se guardó $nombre');
+      }
+    } catch (e) {
+      avisar('No se pudo exportar: $e');
+    } finally {
+      if (mounted) setState(() => _exportando = false);
     }
   }
 
@@ -188,10 +261,21 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
       children: [
         Text('Clases', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        FilledButton.icon(
-          onPressed: cargando || _error != null ? null : () => _abrirDialogo(),
-          icon: const Icon(Icons.add),
-          label: const Text('Dar de alta clase'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton.icon(
+              onPressed: cargando || _error != null ? null : () => _abrirDialogo(),
+              icon: const Icon(Icons.add),
+              label: const Text('Dar de alta clase'),
+            ),
+            OutlinedButton.icon(
+              onPressed: cargando || _error != null || _exportando || _lista.isEmpty ? null : _exportar,
+              icon: const Icon(Icons.file_download_outlined),
+              label: const Text('Exportar asistencia del grupo'),
+            ),
+          ],
         ),
         if (_error != null)
           Padding(

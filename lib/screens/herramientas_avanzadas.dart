@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'lote_clases.dart';
 import 'lote_grupos.dart';
 import 'lote_usuarios.dart';
+import 'version_app.dart';
 
 /// Sección aparte del admin para el trabajo en bloque: cada herramienta lee un CSV, muestra una
 /// vista previa donde se corrige lo que haga falta y solo entonces guarda.
@@ -42,6 +43,15 @@ class HerramientasAvanzadas extends StatelessWidget {
             texto: 'Un CSV con profesor, grupo, materia y salón. Detecta materias repetidas, profesores '
                 'sin acceso y grupos que no existen.',
             alTocar: () => ir(const LoteClases()),
+          ),
+          const SizedBox(height: 8),
+          Text('Aplicación', style: Theme.of(context).textTheme.titleSmall),
+          _Herramienta(
+            icono: Icons.system_update_alt,
+            titulo: 'Versión de la app',
+            texto: 'Cambia la versión publicada del APK, su enlace de descarga y, si hace falta, la '
+                'compilación mínima. Reemplaza editar config/app en la consola de Firebase.',
+            alTocar: () => ir(const VersionApp()),
           ),
         ],
       ),

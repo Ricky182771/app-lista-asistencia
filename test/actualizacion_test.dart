@@ -44,4 +44,94 @@ void main() {
   test('un buildMinimo que no es número no bloquea', () {
     expect(avisoActualizacion(1, {...config, 'buildMinimo': '9'})!.obligatoria, isFalse);
   });
+
+  pruebasConfig();
+}
+
+void pruebasConfig() {
+  const bien = (version: '1.2.0', buildActual: '3', buildMinimo: '', urlApk: urlApkPorOmision);
+
+  group('borradorDeConfig', () {
+    test('lee lo guardado', () {
+      final b = borradorDeConfig({
+        'versionActual': ' 1.2.0 ',
+        'buildActual': 3,
+        'buildMinimo': 2.0,
+        'urlApk': 'https://x.mx/a.apk',
+      });
+      expect(b, (version: '1.2.0', buildActual: '3', buildMinimo: '2', urlApk: 'https://x.mx/a.apk'));
+    });
+    test('sin config/app, todo vacío', () {
+      expect(borradorDeConfig(null), (version: '', buildActual: '', buildMinimo: '', urlApk: ''));
+    });
+  });
+
+  group('validarConfig', () {
+    test('un formulario bueno no tiene errores, con o sin buildMinimo', () {
+      expect(validarConfig(bien).hayErrores, isFalse);
+      expect(validarConfig((version: '1.2.0', buildActual: '3', buildMinimo: '3', urlApk: urlApkPorOmision)).hayErrores,
+          isFalse);
+    });
+    test('versión vacía o mal escrita', () {
+      expect(validarConfig((version: '', buildActual: '3', buildMinimo: '', urlApk: urlApkPorOmision)).version, isNotNull);
+      expect(validarConfig((version: 'v1.2', buildActual: '3', buildMinimo: '', urlApk: urlApkPorOmision)).version,
+          isNotNull);
+      expect(validarConfig((version: '1', buildActual: '3', buildMinimo: '', urlApk: urlApkPorOmision)).version, isNotNull);
+    });
+    test('buildActual debe ser entero positivo', () {
+      for (final mal in ['', 'x', '0', '-1', '2.5']) {
+        expect(validarConfig((version: '1.2.0', buildActual: mal, buildMinimo: '', urlApk: urlApkPorOmision)).buildActual,
+            isNotNull, reason: mal);
+      }
+    });
+    test('buildMinimo: entero positivo y no mayor que buildActual', () {
+      String? error(String minimo) =>
+          validarConfig((version: '1.2.0', buildActual: '3', buildMinimo: minimo, urlApk: urlApkPorOmision)).buildMinimo;
+      expect(error('2'), isNull);
+      expect(error('3'), isNull);
+      expect(error('4'), contains('mayor'));
+      expect(error('x'), isNotNull);
+      expect(error('0'), isNotNull);
+    });
+    test('el enlace debe ser https', () {
+      String? error(String url) =>
+          validarConfig((version: '1.2.0', buildActual: '3', buildMinimo: '', urlApk: url)).urlApk;
+      expect(error('http://x.mx/a.apk'), isNotNull);
+      expect(error('x.mx/a.apk'), isNotNull);
+      expect(error(''), isNotNull);
+      expect(error('https://x.mx/mi apk.apk'), isNotNull);
+      expect(error('https://x.mx/a.apk'), isNull);
+    });
+    test('lo que valida la pantalla lo acepta avisoActualizacion', () {
+      final config = configParaGuardar((version: '1.2.0', buildActual: '5', buildMinimo: '4', urlApk: urlApkPorOmision));
+      final aviso = avisoActualizacion(3, config);
+      expect(aviso, isNotNull);
+      expect(aviso!.obligatoria, isTrue);
+      expect(avisoActualizacion(4, config)!.obligatoria, isFalse);
+      expect(avisoActualizacion(5, config), isNull);
+    });
+  });
+
+  group('configParaGuardar', () {
+    test('números como enteros y buildMinimo vacío = null (se borra)', () {
+      expect(configParaGuardar((version: ' 1.2.0 ', buildActual: ' 3 ', buildMinimo: '', urlApk: ' https://x.mx/a.apk ')), {
+        'versionActual': '1.2.0',
+        'buildActual': 3,
+        'buildMinimo': null,
+        'urlApk': 'https://x.mx/a.apk',
+      });
+    });
+  });
+
+  group('advertenciaConfig', () {
+    test('sin buildMinimo no hay nada que advertir', () {
+      expect(advertenciaConfig(bien, null), isNull);
+    });
+    test('un buildMinimo nuevo o distinto advierte; el mismo de antes, no', () {
+      const nuevo = (version: '1.2.0', buildActual: '3', buildMinimo: '3', urlApk: urlApkPorOmision);
+      expect(advertenciaConfig(nuevo, bien), contains('menor que 3'));
+      expect(advertenciaConfig(nuevo, null), isNotNull);
+      expect(advertenciaConfig(nuevo, nuevo), isNull);
+    });
+  });
 }
