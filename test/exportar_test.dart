@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app_lista_asistencia/models/exportar.dart';
 import 'package:app_lista_asistencia/models/pase.dart';
+import 'package:app_lista_asistencia/models/xlsx.dart' show EstiloXlsx;
 
 import 'zip_util.dart';
 
@@ -51,9 +52,10 @@ void main() {
         'PaseLista - 3A_B - Física_ I - 2026-09 a 2026-11.csv');
   });
 
-  test('porcentajeAsistencia: la justificada cuenta como falta; sin registros, null', () {
-    expect(porcentajeAsistencia((presentes: 3, faltas: 0, justificadas: 1)), 0.75);
-    expect(porcentajeAsistencia((presentes: 0, faltas: 0, justificadas: 0)), isNull);
+  test('porcentajeAsistencia: dual cuenta como asistencia, la justificada como falta; sin registros, null', () {
+    expect(porcentajeAsistencia((presentes: 3, faltas: 0, justificadas: 1, duales: 0)), 0.75);
+    expect(porcentajeAsistencia((presentes: 1, faltas: 1, justificadas: 0, duales: 2)), 0.75);
+    expect(porcentajeAsistencia((presentes: 0, faltas: 0, justificadas: 0, duales: 0)), isNull);
   });
 
   group('Registro', () {
@@ -78,12 +80,13 @@ void main() {
         pases: {
           '2026-11-03': {'1': falta},
           '2026-11-04': {'1': 7},
+          '2026-11-05': {'1': dual},
         },
         alumnos: const [],
         meses: {'2026-11'},
       );
       expect(r.estado('2026-11-04', '1'), isNull);
-      expect(r.conteo('1', r.fechas), (presentes: 0, faltas: 1, justificadas: 0));
+      expect(r.conteo('1', r.fechas), (presentes: 0, faltas: 1, justificadas: 0, duales: 1));
     });
   });
 
@@ -91,10 +94,10 @@ void main() {
     expect(
       csvRegistro(_registro({'2026-10', '2026-11'})),
       '\uFEFFN.L,Nombre,Estatus,2026-10-30,2026-11-03,2026-11-04,Asistencias,Faltas,Faltas justificadas,'
-      '% asistencia\r\n'
-      '1,Ana Pérez,Activo,P,F,P,2,1,0,66.7\r\n'
-      '2,"Beto, el Grande",Activo,F,J,P,1,1,1,33.3\r\n'
-      "3,'=Cero,Baja,,P,,1,0,0,100.0\r\n",
+      'Dual,% asistencia\r\n'
+      '1,Ana Pérez,Activo,P,F,P,2,1,0,0,66.7\r\n'
+      '2,"Beto, el Grande",Activo,F,J,P,1,1,1,0,33.3\r\n'
+      "3,'=Cero,Baja,,P,,1,0,0,0,100.0\r\n",
     );
     // utf8.decode se come el BOM, así que se revisan los bytes: EF BB BF y luego "N.L,".
     expect(csvRegistroBytes(_registro({'2026-11'})).take(7), [0xEF, 0xBB, 0xBF, ...ascii.encode('N.L,')]);
@@ -112,7 +115,8 @@ void main() {
       expect(hoja, contains('<c r="C5" s="6" t="inlineStr"><is><t xml:space="preserve">F</t>'));
       expect(hoja, contains('<c r="D5" s="5" t="inlineStr"><is><t xml:space="preserve">P</t>'));
       expect(hoja, contains('<c r="E5" s="10"><f>COUNTIF(C5:D5,&quot;P&quot;)</f><v>1</v></c>'));
-      expect(hoja, contains('<f>IF(SUM(E5:G5)=0,&quot;&quot;,E5/SUM(E5:G5))</f><v>0.5</v>'));
+      expect(hoja, contains('<c r="H5" s="10"><f>COUNTIF(C5:D5,&quot;D&quot;)</f><v>0</v></c>'));
+      expect(hoja, contains('<f>IF(SUM(E5:H5)=0,&quot;&quot;,(E5+H5)/SUM(E5:H5))</f><v>0.5</v>'));
       // La baja, en gris; la fila 8 cuenta faltas por día.
       expect(hoja, contains('=Cero (baja)'));
       expect(hoja, contains('<f>COUNTIF(C5:C7,&quot;F&quot;)</f><v>1</v>'));
@@ -129,7 +133,8 @@ void main() {
       expect(resumen, contains('% oct 2026'));
       // Ana: 2 de 3 en el periodo.
       expect(resumen, contains('<c r="C5" s="10"><v>2</v></c>'));
-      expect(resumen, contains('<c r="F5" s="11"><v>0.6666666666666666</v></c>'));
+      expect(resumen, contains('<c r="F5" s="10"><v>0</v></c>'));
+      expect(resumen, contains('<c r="G5" s="11"><v>0.6666666666666666</v></c>'));
     });
 
     test('con subtítulo, el profe y el salón van en el título de cada hoja', () {
@@ -153,6 +158,34 @@ void main() {
 
     test('sin pases en los meses elegidos falla', () {
       expect(() => xlsxRegistro(_registro({'2026-12'})), throwsArgumentError);
+    });
+  });
+
+  group('dual', () {
+    final r = Registro(
+      titulo: 't',
+      pases: {
+        '2026-11-03': {'1': dual, '2': presente},
+        '2026-11-04': {'1': falta, '2': presente},
+      },
+      alumnos: const [
+        {'num': 1, 'nombre': 'Ana', 'activo': true},
+        {'num': 2, 'nombre': 'Beto', 'activo': true},
+      ],
+      duales: const {'1'},
+      meses: {'2026-11'},
+    );
+
+    test('csv: letra D, columna Dual, estatus "Activo · Dual" y el dual cuenta como asistencia', () {
+      final lineas = csvRegistro(r).split('\r\n');
+      expect(lineas[1], '1,Ana,Activo · Dual,D,F,0,1,0,1,50.0');
+      expect(lineas[2], '2,Beto,Activo,P,P,2,0,0,0,100.0');
+    });
+
+    test('xlsx: D blanca sobre azul', () {
+      final hoja = leerZip(xlsxRegistro(r))['xl/worksheets/sheet1.xml']!;
+      expect(hoja, contains('<c r="C5" s="${EstiloXlsx.dual.index}" t="inlineStr"><is><t xml:space="preserve">D</t>'));
+      expect(hoja, contains('<f>IF(SUM(E5:H5)=0,&quot;&quot;,(E5+H5)/SUM(E5:H5))</f><v>0.5</v>'));
     });
   });
 }

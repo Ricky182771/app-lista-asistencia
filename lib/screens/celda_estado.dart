@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../models/pase.dart';
 
-const _nombres = {presente: 'Presente', falta: 'Falta', justificada: 'Falta justificada'};
+const _nombres = {presente: 'Presente', falta: 'Falta', justificada: 'Falta justificada', dual: 'Dual'};
 
-/// En la leyenda compacta "Falta justificada" no cabe junto a las otras dos en un teléfono.
-const _nombresCortos = {presente: 'Presente', falta: 'Falta', justificada: 'Justificada'};
+/// En la leyenda compacta "Falta justificada" no cabe junto a las otras en un teléfono.
+const _nombresCortos = {presente: 'Presente', falta: 'Falta', justificada: 'Justificada', dual: 'Dual'};
+
+/// Azul del modo dual: fondo de la celda y del botón que lo activa.
+const azulDual = Color(0xFF1565C0);
 
 /// Ancho a partir del cual la pantalla ya no se considera teléfono: debajo, la vista por día y la
 /// mensual usan su versión compacta.
@@ -35,6 +38,10 @@ class CeldaEstado extends StatelessWidget {
             decoration: const BoxDecoration(color: Color(0xFF000000), shape: BoxShape.circle),
           ),
         ),
+      dual => (
+          azulDual,
+          Container(width: tamano / 4, height: tamano / 4, color: const Color(0xFFFFFFFF)),
+        ),
       _ => (null, null),
     };
     return Semantics(
@@ -55,14 +62,16 @@ class CeldaEstado extends StatelessWidget {
 }
 
 /// Qué significa cada color. [compacta]: cuadros chicos, texto chico y "Justificada" en vez de
-/// "Falta justificada", para que quepa en una sola línea en un teléfono.
+/// "Falta justificada", para que quepa en una sola línea en un teléfono. [conDual]: el grupo tiene
+/// alumnos duales; si no, "Dual" no aparece.
 class LeyendaEstados extends StatelessWidget {
-  const LeyendaEstados({super.key, this.compacta = false});
+  const LeyendaEstados({super.key, this.compacta = false, this.conDual = false});
   final bool compacta;
+  final bool conDual;
 
   @override
   Widget build(BuildContext context) {
-    final nombres = compacta ? _nombresCortos : _nombres;
+    final nombres = {...compacta ? _nombresCortos : _nombres}..removeWhere((e, _) => e == dual && !conDual);
     return Wrap(
       spacing: compacta ? 12 : 16,
       runSpacing: compacta ? 4 : 8,

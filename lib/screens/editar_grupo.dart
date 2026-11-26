@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/grupo.dart';
+import '../models/pase.dart' show dualesDe;
 import '../services/grupos.dart';
 import 'acciones_grupo.dart';
 import 'clases_grupo.dart';
@@ -122,6 +123,7 @@ class _EditarGrupoState extends State<EditarGrupo> {
     final bajas = alumnos.length - activos;
     final gris = Theme.of(context).colorScheme.outline;
     final editable = _editable;
+    final duales = dualesDe(doc.data()?['duales']);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -183,15 +185,21 @@ class _EditarGrupoState extends State<EditarGrupo> {
             ),
             title: Text(a.nombre, style: a.activo ? null : TextStyle(color: gris)),
             subtitle: a.activo ? null : const Text('Dado de baja'),
-            trailing: PopupMenuButton<void Function()>(
-              enabled: editable,
-              tooltip: 'Opciones',
-              onSelected: (accion) => accion(),
-              itemBuilder: (_) => [
-                PopupMenuItem(value: () => _corregir(a), child: const Text('Corregir nombre')),
-                PopupMenuItem(
-                  value: () => _cambiarActivo(a, !a.activo),
-                  child: Text(a.activo ? 'Dar de baja' : 'Reactivar'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                BotonDual(grupoId: widget.grupoId, num: a.num, nombre: a.nombre, esDual: duales.contains('${a.num}')),
+                PopupMenuButton<void Function()>(
+                  enabled: editable,
+                  tooltip: 'Opciones',
+                  onSelected: (accion) => accion(),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: () => _corregir(a), child: const Text('Corregir nombre')),
+                    PopupMenuItem(
+                      value: () => _cambiarActivo(a, !a.activo),
+                      child: Text(a.activo ? 'Dar de baja' : 'Reactivar'),
+                    ),
+                  ],
                 ),
               ],
             ),

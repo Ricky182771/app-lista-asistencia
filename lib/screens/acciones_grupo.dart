@@ -5,6 +5,31 @@ import 'package:flutter/material.dart';
 
 import '../models/grupo.dart';
 import '../services/grupos.dart';
+import 'celda_estado.dart';
+import 'inicio.dart';
+
+/// Activa o quita el modo dual de un alumno (admin en la pantalla del grupo, orden en el detalle).
+/// Sin `await`: sin internet el Future no se completa (ver CLAUDE.md); solo avisa si falla.
+class BotonDual extends StatelessWidget {
+  const BotonDual({super.key, required this.grupoId, required this.num, required this.nombre, required this.esDual});
+  final String grupoId;
+  final int num;
+  final String nombre;
+  final bool esDual;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        isSelected: esDual,
+        tooltip: esDual ? 'Quitar modo dual a $nombre' : 'Activar modo dual a $nombre',
+        icon: const Icon(Icons.work_outline),
+        selectedIcon: const Icon(Icons.work, color: azulDual),
+        onPressed: () => avisarSiFalla(
+          context,
+          cambiarDual(grupoId, num, !esDual),
+          esDual ? 'No se quitó el modo dual a $nombre' : 'No se activó el modo dual a $nombre',
+        ),
+      );
+}
 
 /// Acciones de admin sobre un grupo completo, desde la lista de grupos o desde la pantalla del grupo.
 enum AccionGrupo { renombrar, eliminar }

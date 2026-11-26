@@ -73,10 +73,10 @@ void main() {
 
     test('conteo por clase y total', () {
       final fisica = g.clases[0], mate = g.clases[1];
-      expect(g.conteoDe('1', fisica), (presentes: 2, faltas: 0, justificadas: 0));
-      expect(g.conteoDe('1', mate), (presentes: 1, faltas: 1, justificadas: 0));
-      expect(g.total('2'), (presentes: 2, faltas: 1, justificadas: 1));
-      expect(g.total('3'), (presentes: 1, faltas: 0, justificadas: 0));
+      expect(g.conteoDe('1', fisica), (presentes: 2, faltas: 0, justificadas: 0, duales: 0));
+      expect(g.conteoDe('1', mate), (presentes: 1, faltas: 1, justificadas: 0, duales: 0));
+      expect(g.total('2'), (presentes: 2, faltas: 1, justificadas: 1, duales: 0));
+      expect(g.total('3'), (presentes: 1, faltas: 0, justificadas: 0, duales: 0));
     });
 
     test('sin pases en los meses elegidos no hay clases', () {
@@ -93,11 +93,13 @@ void main() {
       expect(lineas[0],
           'N.L,Nombre,Estatus,'
           'Física (Prof. Beto Ruiz) - Asistencias,Física (Prof. Beto Ruiz) - Faltas,Física (Prof. Beto Ruiz) - Justificadas,'
+          'Física (Prof. Beto Ruiz) - Dual,'
           'Matemáticas (Prof. Ana López) - Asistencias,Matemáticas (Prof. Ana López) - Faltas,Matemáticas (Prof. Ana López) - Justificadas,'
-          'Total asistencias,Total faltas,Total justificadas,% asistencia');
-      expect(lineas[1], '1,Ana Pérez,Activo,2,0,0,1,1,0,3,1,0,75.0');
-      expect(lineas[2], '2,Beto Ruiz,Activo,1,1,0,1,0,1,2,1,1,50.0');
-      expect(lineas[3], '3,Caro Díaz,Baja,1,0,0,0,0,0,1,0,0,100.0');
+          'Matemáticas (Prof. Ana López) - Dual,'
+          'Total asistencias,Total faltas,Total justificadas,Total dual,% asistencia');
+      expect(lineas[1], '1,Ana Pérez,Activo,2,0,0,0,1,1,0,0,3,1,0,0,75.0');
+      expect(lineas[2], '2,Beto Ruiz,Activo,1,1,0,0,1,0,1,0,2,1,1,0,50.0');
+      expect(lineas[3], '3,Caro Díaz,Baja,1,0,0,0,0,0,0,0,1,0,0,0,100.0');
       expect(lineas, hasLength(5));
     });
 
@@ -124,6 +126,21 @@ void main() {
       expect(lineas[1], startsWith("1,'=Cero,Activo,"));
       expect(lineas[2], startsWith('2,"Ruiz, Beto",Activo,'));
     });
+
+    test('el estatus de un dual dice "Activo · Dual" y su día dual cuenta como asistencia', () {
+      final g = RegistroGrupo(
+        titulo: 'x',
+        alumnos: _alumnos,
+        duales: const {'1'},
+        delGrupo: [
+          (materia: 'Física', profesor: '', salon: '', pases: {'2026-11-04': {'1': dual, '2': falta}}),
+        ],
+        meses: {'2026-11'},
+      );
+      final lineas = csvGrupo(g).split('\r\n');
+      expect(lineas[1], '1,Ana Pérez,Activo · Dual,0,0,0,1,0,0,0,1,100.0');
+      expect(lineas[2], '2,Beto Ruiz,Activo,0,1,0,0,0,1,0,0,0.0');
+    });
   });
 
   group('xlsxGrupo', () {
@@ -136,17 +153,18 @@ void main() {
       expect(hoja, contains('<t xml:space="preserve">Prueba 3A · Grupo completo</t>'));
       expect(hoja, contains('<t xml:space="preserve">Física (Prof. Beto Ruiz)</t>'));
       expect(hoja, contains('<t xml:space="preserve">Matemáticas (Prof. Ana López)</t>'));
-      expect(hoja, contains('<mergeCell ref="C4:E4"/>'));
-      expect(hoja, contains('<mergeCell ref="F4:H4"/>'));
-      expect(hoja, contains('<mergeCell ref="I4:L4"/>'));
+      expect(hoja, contains('<mergeCell ref="C4:F4"/>'));
+      expect(hoja, contains('<mergeCell ref="G4:J4"/>'));
+      expect(hoja, contains('<mergeCell ref="K4:O4"/>'));
     });
 
     test('los totales de cada alumno son fórmulas que suman sus clases', () {
-      // Ana, fila 6: Física en C:E, Matemáticas en F:H, totales en I:L.
+      // Ana, fila 6: Física en C:F, Matemáticas en G:J, totales en K:O.
       expect(hoja, contains('<c r="C6" s="10"><v>2</v></c>'));
-      expect(hoja, contains('<c r="I6" s="10"><f>C6+F6</f><v>3</v></c>'));
-      expect(hoja, contains('<c r="J6" s="10"><f>D6+G6</f><v>1</v></c>'));
-      expect(hoja, contains('<f>IF(SUM(I6:K6)=0,&quot;&quot;,I6/SUM(I6:K6))</f><v>0.75</v>'));
+      expect(hoja, contains('<c r="K6" s="10"><f>C6+G6</f><v>3</v></c>'));
+      expect(hoja, contains('<c r="L6" s="10"><f>D6+H6</f><v>1</v></c>'));
+      expect(hoja, contains('<c r="N6" s="10"><f>F6+J6</f><v>0</v></c>'));
+      expect(hoja, contains('<f>IF(SUM(K6:N6)=0,&quot;&quot;,(K6+N6)/SUM(K6:N6))</f><v>0.75</v>'));
     });
 
     test('la baja con registro aparece marcada', () {

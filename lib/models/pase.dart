@@ -9,11 +9,24 @@ const presente = 0;
 const falta = 1;
 const justificada = 2;
 
-/// 0 → 1 → 2 → 0. Un valor desconocido vuelve a presente, así nunca se escribe otro valor.
-int siguienteEstado(int e) => switch (e) {
+/// Alumno en modo dual (`grupos.duales`): no está en el salón y cuenta como asistencia.
+const dual = 3;
+
+/// 0 → 1 → 2 → 0; con [esDual], 3 → 0 → 1 → 2 → 3. Un valor desconocido, o un 3 de quien ya no es
+/// dual, vuelve a presente, así nunca se escribe otro valor.
+int siguienteEstado(int e, {bool esDual = false}) => switch (e) {
       presente => falta,
       falta => justificada,
+      justificada when esDual => dual,
       _ => presente,
+    };
+
+/// `grupos.duales` (`[num]`) como N.L en texto, las llaves de `pases.estados`. El N.L puede venir
+/// como `3.0` (ver `alumnosDe`).
+Set<String> dualesDe(Object? campo) => {
+      if (campo is List)
+        for (final n in campo)
+          if (n is num && n.isFinite) '${n.toInt()}',
     };
 
 /// Días hacia atrás (además de hoy) en que el profe puede crear o editar un pase.
@@ -39,11 +52,12 @@ String paseId(String claseId, String fecha) => '${claseId}_$fecha';
 
 bool _activo(Map<dynamic, dynamic> alumno) => alumno['activo'] != false;
 
-/// Estados de un pase nuevo: cada alumno activo del grupo en presente, con su N.L en texto como llave.
+/// Estados de un pase nuevo: cada alumno activo del grupo en presente (o en dual si está en
+/// [duales]), con su N.L en texto como llave.
 /// [alumnos] es `grupos.alumnos` tal como llega de Firestore: `[{num, nombre, activo}]`.
-Map<String, int> estadosIniciales(List<dynamic> alumnos) => {
+Map<String, int> estadosIniciales(List<dynamic> alumnos, Set<String> duales) => {
       for (final a in alumnos.cast<Map<dynamic, dynamic>>())
-        if (_activo(a)) '${a['num']}': presente,
+        if (_activo(a)) '${a['num']}': duales.contains('${a['num']}') ? dual : presente,
     };
 
 typedef Fila = ({String nl, String nombre, bool baja});

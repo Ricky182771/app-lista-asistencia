@@ -38,7 +38,7 @@ Para correr la web en otro puerto no uses el 8080: es del emulador de Firestore.
 | Rol | Valor en `rol` | Qué hace |
 | --- | --- | --- |
 | Profesor | `profesor` | Pasa lista de sus clases y edita pases de los últimos 28 días |
-| Encargado de orden | `orden` | Ve ausentes por grupo y copia un mensaje para el grupo de padres; consulta la vista mensual de cualquier clase y la exporta. Solo lee |
+| Encargado de orden | `orden` | Ve ausentes por grupo y copia un mensaje para el grupo de padres; consulta la vista mensual de cualquier clase y la exporta; activa o quita el modo dual de un alumno. Fuera de eso solo lee |
 | Administrativo | `admin` | Sube listas en CSV, da de alta clases, renombra o elimina grupos e invita usuarios; consulta la vista mensual de cualquier clase y la exporta (sin editar pases) |
 
 Los alumnos no usan la app. Entra solo quien tiene invitación: el admin crea `invitaciones/{correo}` y,
@@ -50,15 +50,23 @@ admin se crea a mano en la consola de Firebase.
 ```
 usuarios/{uid}               nombre, email, fotoUrl, rol
 invitaciones/{email}         rol, creadoPor                  // ID = correo en minúsculas
-grupos/{grupoId}             nombre, profesores: [uid], alumnos: [{num, nombre, activo}]
+grupos/{grupoId}             nombre, profesores: [uid], alumnos: [{num, nombre, activo}], duales: [num]
 clases/{id generado}         profesorUid, profesorNombre, grupoId, materia, salon (el de siempre)
 pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el real de ese día),
                              fecha "AAAA-MM-DD", marcadoEn, enviadoEn, editadoEn,
-                             estados: { "<N.L>": 0 | 1 | 2 }
+                             estados: { "<N.L>": 0 | 1 | 2 | 3 }
 config/app                   versionActual, buildActual, buildMinimo (opcional), urlApk
 ```
 
-- **Estados de asistencia:** `0` presente, `1` falta, `2` falta justificada (sin motivo, solo la marca).
+- **Estados de asistencia:** `0` presente, `1` falta, `2` falta justificada (sin motivo, solo la marca),
+  `3` dual (cuenta como asistencia).
+- **Modo dual:** `grupos.duales` son los N.L en modo dual, aparte de `alumnos` para que
+  `guardarAlumnos`, el reemplazo por CSV y los lotes de grupos no lo borren. Lo cambian el admin (botón junto
+  al ⋮ de cada alumno) y el encargado de orden (lista de alumnos del detalle del grupo) con
+  `arrayUnion`/`arrayRemove` sin `await` (`cambiarDual`); las reglas dejan a orden tocar solo `duales`. Un pase
+  nuevo pone en dual a los duales (`estadosIniciales`) y su ciclo al tocar es 3→0→1→2→3; los demás siguen
+  0→1→2→0 y un 3 de quien ya no es dual vuelve a presente. "Dual" sale en la leyenda solo si el grupo tiene
+  duales. En los archivos exportados es la letra D (blanca sobre azul) con su columna Dual.
 - **Una clase = profesor + grupo + materia.** Un profe puede dar varias materias al mismo grupo; lo que no
   se repite es el mismo profe con la misma materia en un grupo (`materiaRepetida`, sin distinguir
   mayúsculas ni acentos). El ID lo genera Firestore en el cliente (`collection('clases').doc()`) al dar de
@@ -183,7 +191,7 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   `FilePicker.saveFile` (en web se descarga; en Android abre "Guardar como"). **.xlsx**: una hoja por mes
   con P/F/J en los colores de la app, totales con `COUNTIF` (con el resultado ya guardado), % de
   asistencia y faltas por día; con varios meses, una hoja "Resumen" al principio. **.csv**: una sola
-  tabla plana, UTF-8 con BOM, comas y CRLF. % asistencia = P / (P + F + J). El .xlsx lo arma
+  tabla plana, UTF-8 con BOM, comas y CRLF. % asistencia = (P + D) / (P + F + J + D). El .xlsx lo arma
   `lib/models/xlsx.dart` sin paquetes (ZIP sin compresión); no agregues uno para esto.
 - **Profe y salón en la vista de orden:** el pase de la mañana, las otras clases del día, el selector
   "Vista mensual de…" y la vista mensual en solo consulta muestran "Prof. Nombre · Salón A7"
