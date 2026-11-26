@@ -123,7 +123,14 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   borde (doble clic la regresa al ancho automático; `anchoNombre()` la limita al 75 % de la pantalla). En
   web el ancho se guarda en `localStorage` (`paselista.anchoNombre`); en Android dura mientras la app esté
   abierta.
-- **Inicio del admin:** dos pestañas. **Grupos**: importar CSV; cada grupo con sus alumnos y número de
+- **Resumen del día (admin):** primera pestaña del inicio del admin (`ResumenDia`, lógica en
+  `lib/models/resumen_dia.dart`). Une todas las clases con los pases de un día (hoy por omisión, con
+  selector de fecha): "X de Y clases con pase", faltas del día, profes con clases y ningún pase, y la
+  lista de clases con filtro (Todas / Sin pase / Con pase) y por grupo. Tocar una clase abre su vista
+  mensual en solo consulta. **No hay horario**: una clase sin pase puede no haber tenido clase ese día,
+  así que solo se resalta (`resaltar`) si alguien más pasó lista ese día; en un día sin ningún pase
+  (fin de semana, festivo) no se resalta nada. Solo lee (`todasLasClases` y `pasesDeLaFecha`).
+- **Inicio del admin:** tres pestañas (Resumen, Grupos y Usuarios). **Grupos**: importar CSV; cada grupo con sus alumnos y número de
   clases, y al tocarlo su pantalla con las clases. **Usuarios**: "Invitar usuario", filtro por rol
   (Todos, Profesores, Encargados de orden, Administrativos, con cuántos hay de cada uno), "Esperando su
   primer inicio de sesión" (invitaciones sin usar, con la ✕ para cancelarlas) y "Con acceso" (quitar

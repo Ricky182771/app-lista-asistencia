@@ -16,6 +16,7 @@ import 'datos_prueba.dart';
 import 'editar_grupo.dart';
 import 'importar_csv.dart';
 import 'inicio.dart';
+import 'resumen_dia.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key, required this.usuario});
@@ -25,8 +26,9 @@ class AdminHome extends StatefulWidget {
   State<AdminHome> createState() => _AdminHomeState();
 }
 
-/// Inicio del admin en dos pestañas: Grupos (y sus clases) y Usuarios (con las invitaciones que
-/// aún nadie usa). La cuenta y cerrar sesión van en el menú del avatar, arriba a la derecha.
+/// Inicio del admin en tres pestañas: Resumen (qué clases ya pasaron lista hoy), Grupos (y sus
+/// clases) y Usuarios (con las invitaciones que aún nadie usa). La cuenta y cerrar sesión van en el
+/// menú del avatar, arriba a la derecha.
 class _AdminHomeState extends State<AdminHome> {
   final _miUid = FirebaseAuth.instance.currentUser?.uid;
   // Suscripciones en el estado: cada pestaña construye su lista al abrirse y un StreamBuilder
@@ -34,6 +36,7 @@ class _AdminHomeState extends State<AdminHome> {
   QuerySnapshot<Map<String, dynamic>>? _usuarios, _invitaciones, _grupos;
   Object? _errorUsuarios, _errorInvitaciones, _errorGrupos;
   QuerySnapshot<Map<String, dynamic>>? _clases;
+  Object? _errorClases;
   late final List<StreamSubscription<void>> _subs;
 
   /// Filtro de la pestaña Usuarios; `null` = todos los roles.
@@ -50,12 +53,12 @@ class _AdminHomeState extends State<AdminHome> {
         },
         onError: (Object e) => setState(() => _errorUsuarios = e),
       ),
-      // Solo para poner al día `clases.profesorNombre`; si falla, la app sigue igual.
-      // También da el número de clases de cada grupo; si falla, la pestaña Grupos no lo muestra.
+      // Pone al día `clases.profesorNombre`, da el número de clases de cada grupo y alimenta el
+      // Resumen del día. Si falla, solo el Resumen lo avisa: el resto de la app sigue igual.
       todasLasClases().listen((s) {
         setState(() => _clases = s);
         _ponerAlDiaNombres();
-      }, onError: (Object _) {}),
+      }, onError: (Object e) => setState(() => _errorClases = e)),
       invitaciones().listen(
         (s) => setState(() => _invitaciones = s),
         onError: (Object e) => setState(() => _errorInvitaciones = e),
@@ -116,13 +119,14 @@ class _AdminHomeState extends State<AdminHome> {
     }
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('PaseLista'),
           actions: [_MenuCuenta(usuario: widget.usuario), const SizedBox(width: 8)],
           bottom: TabBar(
             tabs: [
+              const Tab(text: 'Resumen'),
               const Tab(text: 'Grupos'),
               Tab(
                 child: Badge(
@@ -144,6 +148,12 @@ class _AdminHomeState extends State<AdminHome> {
             Expanded(
               child: TabBarView(
                 children: [
+                  ResumenDia(
+                    clases: _clases,
+                    grupos: _grupos,
+                    usuarios: _usuarios,
+                    errorClases: _errorClases,
+                  ),
                   _pestana('grupos', [
                     const BotonDatosPrueba(), // solo en depuración
                     _boton(
