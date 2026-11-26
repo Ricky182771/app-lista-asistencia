@@ -84,8 +84,8 @@ Future<void> borrarClase(Clase clase, {required bool quitarProfe}) {
 const _servidor = GetOptions(source: Source.server);
 
 /// Pasa la clase a otro profe. A diferencia del resto, **espera con `await` y pide internet**: lee del
-/// servidor las clases del grupo y los pases de la clase, y repasa que no quede ninguno a nombre del
-/// profe anterior.
+/// servidor las clases del grupo y los pases de la clase, y al final repasa que no quede ninguno a
+/// nombre del profe anterior (puede pasar con un pase creado mientras corría el primer lote).
 ///
 /// En el primer `WriteBatch` van la clase (profe nuevo, su nombre, materia y salón), `grupos.profesores`
 /// (entra el nuevo; sale el anterior si ya no le queda otra clase con ese grupo) y los primeros pases;
@@ -114,10 +114,10 @@ Future<void> reasignarClase({
     for (final d in pases.docs)
       if (d.data()['profesorUid'] != profesorUid) d.reference,
   ];
-  // La clase, el grupo y hasta 395 pases en el primer lote (4 escrituras de la clase y el grupo).
+  // La clase, el grupo (hasta 2 escrituras) y hasta 395 pases en el primer lote: 398 como máximo (límite 500).
   final primeros = porMover.take(395).toList();
   final resto = porMover.skip(395).toList();
-  final total = 1 + porMover.length;
+  var total = 1 + porMover.length;
 
   final primer = _db.batch()
     ..update(claseRef, {
@@ -141,13 +141,32 @@ Future<void> reasignarClase({
   var hechos = 1 + primeros.length;
   progreso?.call(hechos, total);
 
-  for (final lote in enLotes(resto, 400)) {
-    final batch = _db.batch();
-    for (final ref in lote) {
-      batch.update(ref, {'profesorUid': profesorUid});
+  Future<void> mover(List<DocumentReference<Map<String, dynamic>>> refs) async {
+    for (final lote in enLotes(refs, 400)) {
+      final batch = _db.batch();
+      for (final ref in lote) {
+        batch.update(ref, {'profesorUid': profesorUid});
+      }
+      await batch.commit();
+      hechos += lote.length;
+      progreso?.call(hechos, total);
     }
-    await batch.commit();
-    hechos += lote.length;
-    progreso?.call(hechos, total);
+  }
+
+  await mover(resto);
+
+  // Repaso final, como el de `borrarGrupo`: un pase que el profe anterior creó entre la lectura de los
+  // pases y el primer commit se quedó con su nombre. Desde el commit de la clase las reglas ya no dejan
+  // crear pases a nombre del profe anterior, así que basta repasar unas pocas veces (por si el servidor
+  // aún estaba poniéndose al día) y la lista se vacía.
+  for (var vuelta = 0; vuelta < 3; vuelta++) {
+    final de = await _db.collection('pases').where('claseId', isEqualTo: clase.id).get(_servidor);
+    final rezagados = [
+      for (final d in de.docs)
+        if (d.data()['profesorUid'] != profesorUid) d.reference,
+    ];
+    if (rezagados.isEmpty) return;
+    total += rezagados.length;
+    await mover(rezagados);
   }
 }

@@ -127,6 +127,21 @@ void pruebasConfig() {
     test('sin buildMinimo no hay nada que advertir', () {
       expect(advertenciaConfig(bien, null), isNull);
     });
+    test('bajar la compilación actual advierte; subirla o dejarla igual, no', () {
+      const antes = (version: '1.2.0', buildActual: '5', buildMinimo: '', urlApk: urlApkPorOmision);
+      expect(advertenciaConfig(bien, antes), contains('baja de 5 a 3'));
+      expect(advertenciaConfig((version: '1.3.0', buildActual: '6', buildMinimo: '', urlApk: urlApkPorOmision), antes),
+          isNull);
+      expect(advertenciaConfig(antes, antes), isNull);
+    });
+    test('si pasan las dos cosas, salen las dos advertencias', () {
+      const antes = (version: '1.2.0', buildActual: '5', buildMinimo: '', urlApk: urlApkPorOmision);
+      const nuevo = (version: '1.2.0', buildActual: '4', buildMinimo: '4', urlApk: urlApkPorOmision);
+      final a = advertenciaConfig(nuevo, antes)!;
+      expect(a, contains('baja de 5 a 4'));
+      expect(a, contains('menor que 4'));
+      expect(a, contains('también tú'));
+    });
     test('un buildMinimo nuevo o distinto advierte; el mismo de antes, no', () {
       const nuevo = (version: '1.2.0', buildActual: '3', buildMinimo: '3', urlApk: urlApkPorOmision);
       expect(advertenciaConfig(nuevo, bien), contains('menor que 3'));
