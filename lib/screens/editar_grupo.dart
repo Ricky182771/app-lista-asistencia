@@ -179,6 +179,7 @@ class _EditarGrupoState extends State<EditarGrupo> {
         if (alumnos.isEmpty) const ListTile(title: Text('Este grupo no tiene alumnos.')),
         for (final a in alumnos)
           ListTile(
+            shape: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
             leading: SizedBox(
               width: 32,
               child: Text('${a.num}', style: a.activo ? null : TextStyle(color: gris)),

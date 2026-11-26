@@ -301,7 +301,12 @@ class _PaseMensualState extends State<PaseMensual> {
     final cabecera = Theme.of(context).textTheme.labelMedium;
     final anchoDia = compacto ? _anchoDiaCompacto : _anchoDia;
 
-    Widget celdaFija(Widget child) => SizedBox(height: _alto, child: Align(alignment: Alignment.centerLeft, child: child));
+    // La línea se pinta dentro de los 48 px de cada fila, así las dos partes siguen alineadas.
+    final linea = BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)));
+    Widget celdaFija(Widget child) => DecoratedBox(
+          decoration: linea,
+          child: SizedBox(height: _alto, child: Align(alignment: Alignment.centerLeft, child: child)),
+        );
 
     return ListView(
       children: [
@@ -340,19 +345,25 @@ class _PaseMensualState extends State<PaseMensual> {
                 ],
               ),
             ),
-            _borde(alto: _alto * (filas.length + 1), ancho: anchoFijo, pantalla: pantalla),
+            _borde(filas: filas.length + 1, linea: linea, ancho: anchoFijo, pantalla: pantalla),
             Expanded(
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Column(
                   children: [
-                    Row(children: [for (final c in columnas) _cabecera(c, pases[c]!, hoy, cabecera, anchoDia, compacto)]),
+                    DecoratedBox(
+                      decoration: linea,
+                      child: Row(children: [for (final c in columnas) _cabecera(c, pases[c]!, hoy, cabecera, anchoDia, compacto)]),
+                    ),
                     for (final f in filas)
-                      Row(
-                        children: [
-                          for (final c in columnas)
-                            _celda(c, pases[c]!.id, f.nl, estadosDe[c]![f.nl], hoy, anchoDia),
-                        ],
+                      DecoratedBox(
+                        decoration: linea,
+                        child: Row(
+                          children: [
+                            for (final c in columnas)
+                              _celda(c, pases[c]!.id, f.nl, estadosDe[c]![f.nl], hoy, anchoDia),
+                          ],
+                        ),
                       ),
                   ],
                 ),
@@ -366,7 +377,7 @@ class _PaseMensualState extends State<PaseMensual> {
 
   /// Borde derecho de la columna Nombre: se arrastra para cambiar el ancho y con doble clic (o doble
   /// toque) vuelve al automático. El ancho elegido se guarda al soltar.
-  Widget _borde({required double alto, required double ancho, required double pantalla}) {
+  Widget _borde({required int filas, required BoxDecoration linea, required double ancho, required double pantalla}) {
     final colores = Theme.of(context).colorScheme;
     return Tooltip(
       message: 'Arrastra para cambiar el ancho · doble clic para restablecer',
@@ -393,15 +404,27 @@ class _PaseMensualState extends State<PaseMensual> {
           onHorizontalDragCancel: _terminarArrastre,
           onDoubleTap: () => setState(() => _guardarAnchoNombre(null)),
           // Área de 16 px para atinarle con el dedo; la línea visible es delgada.
+          // Las líneas de las filas cruzan el borde para que no se corten entre las dos partes.
           child: SizedBox(
             width: 16,
-            height: alto,
-            child: Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                width: _sobreBorde ? 3 : 1,
-                color: _sobreBorde ? colores.primary : colores.outlineVariant,
-              ),
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    for (var i = 0; i < filas; i++)
+                      DecoratedBox(decoration: linea, child: const SizedBox(width: 16, height: _alto)),
+                  ],
+                ),
+                Positioned.fill(
+                  child: Center(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      width: _sobreBorde ? 3 : 1,
+                      color: _sobreBorde ? colores.primary : colores.outlineVariant,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
