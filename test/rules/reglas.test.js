@@ -1,6 +1,7 @@
 // Pruebas de firestore.rules. Correr con:
 // firebase emulators:exec --only firestore "npm --prefix test/rules test"
 import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import {
   assertFails,
@@ -166,6 +167,22 @@ describe('usuarios', () => {
     const db = como('admin');
     await assertSucceeds(getDocs(collection(db, 'usuarios')));
     await assertSucceeds(deleteDoc(doc(db, 'usuarios/profe2')));
+  });
+
+  // Cambiar rol (pestaña Usuarios del admin): el usuario y su invitación en el mismo batch.
+  test('el admin cambia el rol de otro usuario y el de su invitación; nadie más puede', async () => {
+    const db = como('admin');
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'usuarios/profe2'), { rol: 'orden' });
+    lote.set(doc(db, 'invitaciones/profe2@ejemplo.com'), { rol: 'orden' }, { merge: true });
+    await assertSucceeds(lote.commit());
+    assert.equal((await getDoc(doc(db, 'usuarios/profe2'))).data().rol, 'orden');
+    assert.equal((await getDoc(doc(db, 'invitaciones/profe2@ejemplo.com'))).data().rol, 'orden');
+
+    // Un profe no se sube el rol a sí mismo ni cambia el de otro.
+    await assertFails(updateDoc(doc(como('profe'), 'usuarios/profe'), { rol: 'admin' }));
+    await assertFails(updateDoc(doc(como('profe'), 'usuarios/orden'), { rol: 'profesor' }));
+    await assertFails(updateDoc(doc(como('orden'), 'usuarios/orden'), { rol: 'admin' }));
   });
 });
 

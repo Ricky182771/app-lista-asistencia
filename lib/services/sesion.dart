@@ -164,6 +164,21 @@ Future<void> quitarAcceso(String uid, String correo) {
   return batch.commit();
 }
 
+/// Cambia el rol del usuario y el de su invitación en el mismo `WriteBatch`: si solo cambiara el
+/// usuario y alguien borrara su documento a mano, volvería a darse de alta con el rol viejo. La
+/// invitación se escribe con `merge` porque el primer admin (creado a mano en la consola) puede no
+/// tener. El usuario ve su pantalla nueva al instante: `escucharUsuario` emite el cambio.
+/// Sin `await` a propósito (ver [invitar]). Quien llama revisa antes con `errorCambioRol`.
+Future<void> cambiarRol(String uid, String correo, Rol rol) {
+  final batch = _db.batch()..update(_db.doc('usuarios/$uid'), {'rol': rol.name});
+  // Un usuario creado a mano en la consola puede no tener `email`.
+  final c = normalizarCorreo(correo);
+  if (c.isNotEmpty) {
+    batch.set(_db.doc('invitaciones/$c'), {'rol': rol.name}, SetOptions(merge: true));
+  }
+  return batch.commit();
+}
+
 /// Para invitaciones que nadie ha usado. Sin `await` a propósito (ver [invitar]).
 Future<void> cancelarInvitacion(String correo) =>
     _db.doc('invitaciones/${normalizarCorreo(correo)}').delete();
