@@ -274,6 +274,7 @@ class _PaseDiaState extends State<PaseDia> {
     final actual = _cambios[f.nl] ?? (guardados[f.nl] as num?)?.toInt();
     final texto = Theme.of(context).textTheme;
     return ListTile(
+      shape: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
       visualDensity: compacto ? VisualDensity.compact : null,
       contentPadding: compacto ? const EdgeInsets.symmetric(horizontal: 12) : null,
       minLeadingWidth: compacto ? 24 : null,

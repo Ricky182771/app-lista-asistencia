@@ -249,7 +249,7 @@ class _GrupoDetalle extends StatelessWidget {
               else
                 for (final p in otras) _otraClase(context, p, alumnos),
               const Divider(height: 32),
-              _alumnos(alumnos, dualesDe(grupo?.data()['duales'])),
+              _alumnos(context, alumnos, dualesDe(grupo?.data()['duales'])),
             ],
           ),
           bottomNavigationBar: SafeArea(
@@ -344,7 +344,7 @@ class _GrupoDetalle extends StatelessWidget {
   }
 
   /// Alumnos activos con el botón para activar o quitar el modo dual.
-  Widget _alumnos(List<dynamic> alumnos, Set<String> duales) {
+  Widget _alumnos(BuildContext context, List<dynamic> alumnos, Set<String> duales) {
     final activos = alumnosDe(alumnos).where((a) => a.activo).toList();
     final n = activos.where((a) => duales.contains('${a.num}')).length;
     return ExpansionTile(
@@ -354,6 +354,7 @@ class _GrupoDetalle extends StatelessWidget {
       children: [
         for (final a in activos)
           ListTile(
+            shape: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
             contentPadding: EdgeInsets.zero,
             leading: SizedBox(width: 32, child: Text('${a.num}')),
             title: Text(a.nombre),

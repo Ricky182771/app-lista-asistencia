@@ -301,7 +301,12 @@ class _PaseMensualState extends State<PaseMensual> {
     final cabecera = Theme.of(context).textTheme.labelMedium;
     final anchoDia = compacto ? _anchoDiaCompacto : _anchoDia;
 
-    Widget celdaFija(Widget child) => SizedBox(height: _alto, child: Align(alignment: Alignment.centerLeft, child: child));
+    // La línea se pinta dentro de los 48 px de cada fila, así las dos partes siguen alineadas.
+    final linea = BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)));
+    Widget celdaFija(Widget child) => DecoratedBox(
+          decoration: linea,
+          child: SizedBox(height: _alto, child: Align(alignment: Alignment.centerLeft, child: child)),
+        );
 
     return ListView(
       children: [
@@ -346,13 +351,19 @@ class _PaseMensualState extends State<PaseMensual> {
                 scrollDirection: Axis.horizontal,
                 child: Column(
                   children: [
-                    Row(children: [for (final c in columnas) _cabecera(c, pases[c]!, hoy, cabecera, anchoDia, compacto)]),
+                    DecoratedBox(
+                      decoration: linea,
+                      child: Row(children: [for (final c in columnas) _cabecera(c, pases[c]!, hoy, cabecera, anchoDia, compacto)]),
+                    ),
                     for (final f in filas)
-                      Row(
-                        children: [
-                          for (final c in columnas)
-                            _celda(c, pases[c]!.id, f.nl, estadosDe[c]![f.nl], hoy, anchoDia),
-                        ],
+                      DecoratedBox(
+                        decoration: linea,
+                        child: Row(
+                          children: [
+                            for (final c in columnas)
+                              _celda(c, pases[c]!.id, f.nl, estadosDe[c]![f.nl], hoy, anchoDia),
+                          ],
+                        ),
                       ),
                   ],
                 ),
