@@ -214,7 +214,7 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
     } on FirebaseException catch (e) {
       error = e.code == 'unavailable'
           ? 'No hay conexión con el servidor. Conéctate a internet y vuelve a intentarlo.'
-          : '${e.message ?? e.code}';
+          : (e.message ?? e.code);
     } catch (e) {
       error = '$e';
     }

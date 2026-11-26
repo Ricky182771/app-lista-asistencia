@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -23,7 +21,6 @@ class _VersionAppState extends State<VersionApp> {
   final _build = TextEditingController();
   final _minimo = TextEditingController();
   final _url = TextEditingController();
-  late final StreamSubscription<void> _sub;
 
   /// Lo que había en `config/app` al abrir; `null` si no existía. Para saber si el mínimo cambió.
   BorradorConfig? _guardado;
@@ -35,30 +32,37 @@ class _VersionAppState extends State<VersionApp> {
   @override
   void initState() {
     super.initState();
-    _sub = configApp().listen(
-      (s) {
-        // Solo la primera vez: después no se pisa lo que el admin está escribiendo.
-        if (_cargado) return;
-        final b = borradorDeConfig(s.data());
-        setState(() {
-          _cargado = true;
-          _guardado = s.exists ? b : null;
-          _version.text = b.version;
-          _build.text = b.buildActual;
-          _minimo.text = b.buildMinimo;
-          _url.text = b.urlApk.isEmpty ? urlApkPorOmision : b.urlApk;
-        });
-      },
-      onError: (Object e) => setState(() => _errorCarga = e),
-    );
+    _cargar();
     PackageInfo.fromPlatform().then((i) {
       if (mounted) setState(() => _estaApp = 'Esta app: versión ${i.version}, compilación ${i.buildNumber}');
     }).catchError((Object _) {});
   }
 
+  /// Lee `config/app` del servidor (no de la caché, que podría estar vieja) y llena el formulario.
+  Future<void> _cargar() async {
+    setState(() {
+      _cargado = false;
+      _errorCarga = null;
+    });
+    try {
+      final s = await configAppDelServidor();
+      if (!mounted) return;
+      final b = borradorDeConfig(s.data());
+      setState(() {
+        _cargado = true;
+        _guardado = s.exists ? b : null;
+        _version.text = b.version;
+        _build.text = b.buildActual;
+        _minimo.text = b.buildMinimo;
+        _url.text = b.urlApk.isEmpty ? urlApkPorOmision : b.urlApk;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _errorCarga = e);
+    }
+  }
+
   @override
   void dispose() {
-    _sub.cancel();
     for (final c in [_version, _build, _minimo, _url]) {
       c.dispose();
     }
@@ -76,7 +80,7 @@ class _VersionAppState extends State<VersionApp> {
     if (advertencia != null) {
       final ok = await confirmarLote(
         context,
-        titulo: 'Actualización obligatoria',
+        titulo: 'Revisa antes de guardar',
         mensaje: advertencia,
         boton: 'Guardar',
       );
@@ -106,9 +110,23 @@ class _VersionAppState extends State<VersionApp> {
           ),
           if (_estaApp != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_estaApp!)),
           const SizedBox(height: 16),
-          if (_errorCarga != null)
-            Text('No se pudo leer la versión guardada: $_errorCarga',
-                style: TextStyle(color: Theme.of(context).colorScheme.error))
+          if (_errorCarga != null) ...[
+            Text(
+              'No se pudo leer la versión guardada: $_errorCarga\n'
+              'Para editarla se necesita internet: si se mostrara una copia vieja, al guardar podrías '
+              'regresar la versión publicada a un valor anterior.',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _cargar,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+              ),
+            ),
+          ]
           else if (!_cargado)
             const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
           else ...[

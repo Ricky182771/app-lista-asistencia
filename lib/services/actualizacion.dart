@@ -22,9 +22,11 @@ Stream<AvisoActualizacion?> escucharActualizacion() async* {
 /// Abre el enlace del APK en el navegador, que lo descarga; Android pregunta si se instala.
 Future<bool> abrirDescarga(Uri url) => launchUrl(url, mode: LaunchMode.externalApplication);
 
-/// `config/app` en vivo, para el formulario del admin (Herramientas avanzadas → Versión de la app).
-Stream<DocumentSnapshot<Map<String, dynamic>>> configApp() =>
-    FirebaseFirestore.instance.doc('config/app').snapshots(includeMetadataChanges: true);
+/// `config/app` leído **del servidor** para el formulario del admin: con la caché podría traer una
+/// versión vieja y, al guardar, regresar `versionActual` o `buildActual` a valores anteriores. Pide
+/// internet; sin conexión lanza un error y el formulario no se abre.
+Future<DocumentSnapshot<Map<String, dynamic>>> configAppDelServidor() =>
+    FirebaseFirestore.instance.doc('config/app').get(const GetOptions(source: Source.server));
 
 /// Guarda `config/app` con `merge`: no pisa otros campos que alguien haya puesto en la consola. Un
 /// valor `null` borra el campo (así se quita `buildMinimo`). Sin `await` a propósito, como el resto

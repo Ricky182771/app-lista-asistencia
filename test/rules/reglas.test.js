@@ -380,7 +380,11 @@ describe('reasignar una clase a otro profe', () => {
     await assertFails(reasignar(como('orden'), [PASE]));
   });
 
-  test('un batch de 395 pases de la misma clase cabe en los límites de las reglas', async () => {
+  // OJO: el emulador NO aplica el límite de 20 lecturas (get/getAfter/exists) por batch de producción, así
+  // que esta prueba solo comprueba la lógica con muchos pases. Que en producción quepa depende de que
+  // Firestore reutilice las lecturas repetidas de los mismos documentos (usuarios/{admin} y clases/{id}).
+  // Pendiente: probarlo a mano con una clase de más de 20 pases.
+  test('un batch de 395 pases de la misma clase pasa la lógica de las reglas (el emulador no aplica el límite de lecturas)', async () => {
     const ids = [];
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();

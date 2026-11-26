@@ -101,13 +101,24 @@ Map<String, Object?> configParaGuardar(BorradorConfig b) => {
       'urlApk': b.urlApk.trim(),
     };
 
-/// Advertencia antes de guardar cuando la actualización pasa a ser obligatoria: [antes] es lo que
-/// había (`null` si `config/app` no existía). `null` si no hace falta advertir nada.
+/// Advertencias antes de guardar, separadas por una línea en blanco; `null` si no hace falta ninguna.
+/// [antes] es lo que había (`null` si `config/app` no existía).
+/// - Poner un `buildMinimo` nuevo bloquea a quien tenga menos, también a un admin con ese APK en Android.
+/// - Bajar `buildActual` hace que los celulares que ya actualizaron dejen de ver el aviso y puede ser un
+///   error de dedo.
 String? advertenciaConfig(BorradorConfig b, BorradorConfig? antes) {
+  final avisos = <String>[];
+  final actual = _entero(b.buildActual);
+  final actualAntes = antes == null ? null : _entero(antes.buildActual);
+  if (actual != null && actualAntes != null && actual < actualAntes) {
+    avisos.add('La compilación actual baja de $actualAntes a $actual. Es válido para volver a una '
+        'versión anterior, pero si fue un error de dedo, corrígelo antes de guardar.');
+  }
   final minimo = _entero(b.buildMinimo);
-  if (minimo == null) return null;
-  if (antes != null && _entero(antes.buildMinimo) == minimo) return null;
-  return 'Quien tenga una compilación menor que $minimo no podrá usar la app hasta actualizarla '
-      '(la web no se ve afectada). Asegúrate de que el APK de esa versión ya esté publicado y '
-      'que el enlace funcione.';
+  if (minimo != null && (antes == null || _entero(antes.buildMinimo) != minimo)) {
+    avisos.add('Quien tenga una compilación menor que $minimo no podrá usar la app hasta actualizarla, '
+        'también tú si tu celular Android tiene un APK anterior (te queda la web). La web no se ve '
+        'afectada. Asegúrate de que el APK de esa versión ya esté publicado y que el enlace funcione.');
+  }
+  return avisos.isEmpty ? null : avisos.join('\n\n');
 }

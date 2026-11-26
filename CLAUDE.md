@@ -91,8 +91,11 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   si ya no le queda otra clase con ese grupo) y los primeros 395 pases (`profesorUid`); el resto, en lotes
   de 400. Los pases ya hechos pasan al profe nuevo para que vea todo el historial. **Reglas:** el admin
   puede hacer `update()` de un pase solo si cambia únicamente `profesorUid` y es el que la clase tiene al
-  terminar el batch (`getAfter`). Reintentar es seguro: solo mueve los pases que aún no son del profe
-  nuevo. **Hay que desplegar las reglas antes de usar la app nueva.**
+  terminar el batch (`getAfter`). Al final hace un **repaso** (hasta 3 vueltas) de los pases que siguen a
+  nombre del profe anterior. Reintentar es seguro: solo mueve los pases que aún no son del profe nuevo.
+  **Pendiente de comprobar en producción:** el emulador no aplica el límite de 20 lecturas de reglas por
+  batch; prueba reasignar una clase con más de 20 pases. Si Firestore rechaza el batch, no queda nada a
+  medias. **Hay que desplegar las reglas antes de usar la app nueva.**
 - **Quitar acceso** = borrar `usuarios/{uid}` + `invitaciones/{correo}` en el mismo `WriteBatch`. Si
   solo se borra el usuario, la invitación sigue y la persona se da de alta sola al volver a entrar.
 - **Cambiar rol** (`cambiarRol`, menú ⋮ del usuario) actualiza `usuarios/{uid}.rol` y `invitaciones/{correo}.rol`
@@ -200,7 +203,7 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   vez del inicio. Solo en Android: la web siempre es la desplegada. Si `config/app` no existe, viene mal
   (`avisoActualizacion` exige `buildActual` numérico y `urlApk` https) o no se puede leer, no avisa ni
   bloquea. Lo lee cualquier usuario dado de alta (`registrado()` en las reglas); solo el admin lo escribe,
-  desde Herramientas avanzadas → **Versión de la app** (`VersionApp`; valida con `validarConfig`: versión
+  desde Herramientas avanzadas → **Versión de la app** (`VersionApp`, que **lee `config/app` del servidor** y pide internet; valida con `validarConfig`: versión
   `1.2.0`, `buildActual` entero, `buildMinimo` opcional y no mayor que `buildActual`, `urlApk` https; al
   poner un `buildMinimo` nuevo pide confirmar porque bloquea a quien tenga menos) o desde la consola.
 - **Mensaje para padres:** uno por grupo al día, a partir del **pase de la mañana** (el primero del día
