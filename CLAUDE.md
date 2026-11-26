@@ -86,6 +86,10 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   tanto. Se confirma escribiendo el nombre del grupo (`confirmaNombre`). No se puede deshacer.
 - **Quitar acceso** = borrar `usuarios/{uid}` + `invitaciones/{correo}` en el mismo `WriteBatch`. Si
   solo se borra el usuario, la invitación sigue y la persona se da de alta sola al volver a entrar.
+- **Cambiar rol** (`cambiarRol`, menú ⋮ del usuario) actualiza `usuarios/{uid}.rol` y `invitaciones/{correo}.rol`
+  (con `merge`: el primer admin puede no tener invitación) en el mismo `WriteBatch`; el usuario ve su
+  pantalla nueva al instante. Candados en `errorCambioRol`: nadie cambia su propio rol y un profe con clases
+  no cambia de rol hasta que se reasignen o se borren.
 - Los IDs de `pases` son **determinísticos** para que un reintento sin internet no duplique documentos.
   Los de `clases` ya no: se generan una sola vez en el cliente, y un reintento reusa ese mismo ID.
 - Editar un pase es un `update()` que solo toca `estados` y `editadoEn`
@@ -134,7 +138,9 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   clases, y al tocarlo su pantalla con las clases. **Usuarios**: "Invitar usuario", filtro por rol
   (Todos, Profesores, Encargados de orden, Administrativos, con cuántos hay de cada uno), "Esperando su
   primer inicio de sesión" (invitaciones sin usar, con la ✕ para cancelarlas) y "Con acceso" (quitar
-  acceso). Una invitación sale de "Esperando…" en cuanto esa persona entra (`invitacionesSinUsar`, que
+  acceso), con buscador (nombre, correo o rol) y el filtro "Profesores sin clases". Cada usuario tiene un
+  menú ⋮ con **Cambiar rol** y **Quitar acceso** (el admin no puede hacer ninguna de las dos consigo
+  mismo). Una invitación sale de "Esperando…" en cuanto esa persona entra (`invitacionesSinUsar`, que
   compara correos normalizados); la pestaña cuenta las que esperan. La cuenta y cerrar sesión van en el
   menú del avatar de la barra (`_MenuCuenta`); los otros roles siguen usando `Inicio`.
 - **Vista mensual para admin y orden:** `PaseMensual(soloLectura: true)` vía `abrirConsultaMensual`. Admin

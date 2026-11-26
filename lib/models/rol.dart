@@ -1,15 +1,26 @@
 // Lógica pura de roles: sin Firebase, para poder probarla con `flutter test`.
 
 enum Rol {
-  profesor('Profesor', 'Profesores'),
-  orden('Encargado de orden', 'Encargados de orden'),
-  admin('Administrativo', 'Administrativos');
+  profesor('Profesor', 'Profesores', 'Pasa lista de sus clases.'),
+  orden(
+    'Encargado de orden',
+    'Encargados de orden',
+    'Ve ausentes por grupo y copia el mensaje para los padres. Solo consulta.',
+  ),
+  admin(
+    'Administrativo',
+    'Administrativos',
+    'Administra grupos, clases y usuarios; consulta y exporta la asistencia.',
+  );
 
-  const Rol(this.etiqueta, this.plural);
+  const Rol(this.etiqueta, this.plural, this.descripcion);
   final String etiqueta;
 
   /// Para los filtros de la lista de usuarios del admin.
   final String plural;
+
+  /// Qué puede hacer, en una línea (al invitar o cambiar de rol).
+  final String descripcion;
 }
 
 /// Convierte el campo `rol` de Firestore; cualquier otra cosa es `null`.

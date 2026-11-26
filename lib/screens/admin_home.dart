@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../models/clase.dart' show claseDe, nombresDesactualizados;
 import '../models/rol.dart';
+import '../models/usuarios.dart';
 import '../services/clases.dart' show ponerNombresDeProfes;
 import '../services/grupos.dart';
 import '../services/pases.dart' show todasLasClases;
@@ -41,6 +42,12 @@ class _AdminHomeState extends State<AdminHome> {
 
   /// Filtro de la pestaña Usuarios; `null` = todos los roles.
   Rol? _filtro;
+
+  /// Pestaña Usuarios: solo profes sin ninguna clase dada de alta.
+  bool _soloSinClases = false;
+
+  final _buscarUsuarios = TextEditingController();
+  final _buscarGrupos = TextEditingController();
 
   @override
   void initState() {
@@ -92,6 +99,8 @@ class _AdminHomeState extends State<AdminHome> {
     for (final s in _subs) {
       s.cancel();
     }
+    _buscarUsuarios.dispose();
+    _buscarGrupos.dispose();
     super.dispose();
   }
 
@@ -110,8 +119,13 @@ class _AdminHomeState extends State<AdminHome> {
       for (final d in [...?_invitaciones?.docs])
         if (sinUsar.contains(d.id)) d,
     ]..sort((a, b) => a.id.compareTo(b.id));
-    final grupos = [...?_grupos?.docs]
+    final todosLosGrupos = [...?_grupos?.docs]
       ..sort((a, b) => '${a.data()['nombre'] ?? a.id}'.compareTo('${b.data()['nombre'] ?? b.id}'));
+    final busquedaGrupos = _buscarGrupos.text.trim();
+    final grupos = [
+      for (final d in todosLosGrupos)
+        if (coincideBusqueda(busquedaGrupos, ['${d.data()['nombre'] ?? d.id}'])) d,
+    ];
     final clasesPorGrupo = <String, int>{};
     for (final c in [...?_clases?.docs]) {
       final g = '${c.data()['grupoId']}';
@@ -165,9 +179,18 @@ class _AdminHomeState extends State<AdminHome> {
                       ),
                     ),
                     const _Ayuda('Toca un grupo para ver sus alumnos y darle de alta sus clases.'),
-                    ..._seccion(_grupos, _errorGrupos, 'Aún no hay grupos.', [
-                      for (final d in grupos) _filaGrupo(d, clasesPorGrupo[d.id]),
-                    ]),
+                    if (todosLosGrupos.length > 1)
+                      _Buscador(
+                        controlador: _buscarGrupos,
+                        ayuda: 'Buscar grupo',
+                        alCambiar: () => setState(() {}),
+                      ),
+                    ..._seccion(
+                      _grupos,
+                      _errorGrupos,
+                      busquedaGrupos.isEmpty ? 'Aún no hay grupos.' : 'Ningún grupo coincide con "$busquedaGrupos".',
+                      [for (final d in grupos) _filaGrupo(d, clasesPorGrupo[d.id])],
+                    ),
                   ]),
                   _pestana('usuarios', _pestanaUsuarios(usuarios, pendientes)),
                 ],
@@ -191,9 +214,40 @@ class _AdminHomeState extends State<AdminHome> {
         .where((d) => r == null || parseRol(d.data()['rol']) == r)
         .length;
     final titulo = Theme.of(context).textTheme.titleSmall;
-    final usuariosFiltrados = [for (final d in usuarios) if (pasa(d.data()['rol'])) d];
-    final pendientesFiltrados = [for (final d in pendientes) if (pasa(d.data()['rol'])) d];
+    // Sin las clases cargadas no se sabe quién está sin clases (`null` = desconocido).
+    final clasesDe = _clases == null
+        ? null
+        : clasesPorProfe([for (final d in _clases!.docs) ?claseDe(d.id, d.data())]);
+    bool sinClases(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
+        clasesDe != null && parseRol(d.data()['rol']) == Rol.profesor && (clasesDe[d.id] ?? 0) == 0;
+    final busqueda = _buscarUsuarios.text.trim();
+    final usuariosFiltrados = [
+      for (final d in usuarios)
+        if (pasa(d.data()['rol']) &&
+            (!_soloSinClases || sinClases(d)) &&
+            coincideBusqueda(busqueda, [
+              '${d.data()['nombre'] ?? ''}',
+              '${d.data()['email'] ?? ''}',
+              parseRol(d.data()['rol'])?.etiqueta ?? '',
+            ]))
+          d,
+    ];
+    // Quien aún no entra no tiene clases: con "sin clases" activo no se muestran.
+    final pendientesFiltrados = [
+      for (final d in pendientes)
+        if (pasa(d.data()['rol']) &&
+            !_soloSinClases &&
+            coincideBusqueda(busqueda, [d.id, parseRol(d.data()['rol'])?.etiqueta ?? '']))
+          d,
+    ];
     final nombreFiltro = _filtro?.plural.toLowerCase();
+    final vacia = busqueda.isNotEmpty
+        ? 'Nadie coincide con "$busqueda".'
+        : _soloSinClases
+            ? 'Todos los profesores tienen clases.'
+            : nombreFiltro == null
+                ? 'Aún no hay usuarios.'
+                : 'No hay $nombreFiltro con acceso.';
 
     return [
       _boton(icono: Icons.person_add, texto: 'Invitar usuario', onPressed: _invitar),
@@ -207,9 +261,20 @@ class _AdminHomeState extends State<AdminHome> {
               selected: _filtro == r,
               onSelected: (_) => setState(() => _filtro = r),
             ),
+          if (clasesDe != null)
+            FilterChip(
+              label: Text('Profesores sin clases (${usuarios.where(sinClases).length})'),
+              selected: _soloSinClases,
+              onSelected: (v) => setState(() => _soloSinClases = v),
+            ),
         ],
       ),
       const SizedBox(height: 8),
+      _Buscador(
+        controlador: _buscarUsuarios,
+        ayuda: 'Buscar por nombre o correo',
+        alCambiar: () => setState(() {}),
+      ),
       if (_errorInvitaciones != null) Text('Error al cargar las invitaciones: $_errorInvitaciones'),
       if (pendientesFiltrados.isNotEmpty) ...[
         Padding(
@@ -228,8 +293,8 @@ class _AdminHomeState extends State<AdminHome> {
       ..._seccion(
         _usuarios,
         _errorUsuarios,
-        nombreFiltro == null ? 'Aún no hay usuarios.' : 'No hay $nombreFiltro con acceso.',
-        [for (final d in usuariosFiltrados) _filaUsuario(d)],
+        vacia,
+        [for (final d in usuariosFiltrados) _filaUsuario(d, clasesDe)],
       ),
     ];
   }
@@ -321,24 +386,78 @@ class _AdminHomeState extends State<AdminHome> {
     ];
   }
 
-  Widget _filaUsuario(QueryDocumentSnapshot<Map<String, dynamic>> d) {
+  /// [clasesDe]: profeUid → clases dadas de alta; `null` si aún no se cargan.
+  Widget _filaUsuario(QueryDocumentSnapshot<Map<String, dynamic>> d, Map<String, int>? clasesDe) {
     final datos = d.data();
     final nombre = '${datos['nombre'] ?? ''}';
     final correo = '${datos['email'] ?? ''}';
+    final rol = parseRol(datos['rol']);
     final soyYo = d.id == _miUid;
+    final clases = clasesDe == null || rol != Rol.profesor ? null : clasesDe[d.id] ?? 0;
     return ListTile(
       leading: Avatar(fotoUrl: datos['fotoUrl'] as String?, nombre: nombre),
       title: Text(nombre),
       subtitle: Text([
         correo,
-        parseRol(datos['rol'])?.etiqueta ?? '${datos['rol']}',
+        rol?.etiqueta ?? '${datos['rol']}',
+        if (clases != null) textoClases(clases),
         if (d.metadata.hasPendingWrites) 'pendiente de sincronizar',
       ].join(' · ')),
-      trailing: TextButton(
-        // Un admin no puede quitarse el acceso a sí mismo.
-        onPressed: soyYo ? null : () => _confirmarQuitar(d.id, nombre, correo),
-        child: const Text('Quitar acceso'),
+      // Un admin no puede quitarse el acceso ni cambiarse el rol a sí mismo.
+      trailing: soyYo
+          ? const Padding(padding: EdgeInsets.only(right: 12), child: Text('Tú'))
+          : PopupMenuButton<_AccionUsuario>(
+              tooltip: 'Opciones',
+              onSelected: (accion) {
+                switch (accion) {
+                  case _AccionUsuario.cambiarRol:
+                    _cambiarRol(d.id, nombre, correo, rol, rol == Rol.profesor ? clases : 0);
+                  case _AccionUsuario.quitarAcceso:
+                    _confirmarQuitar(d.id, nombre, correo);
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: _AccionUsuario.cambiarRol,
+                  child: ListTile(leading: Icon(Icons.manage_accounts_outlined), title: Text('Cambiar rol')),
+                ),
+                PopupMenuItem(
+                  value: _AccionUsuario.quitarAcceso,
+                  child: ListTile(leading: Icon(Icons.person_remove_outlined), title: Text('Quitar acceso')),
+                ),
+              ],
+            ),
+    );
+  }
+
+  /// [clases]: las que tiene dadas de alta; `null` = aún no se saben (no se deja cambiar a un profe
+  /// sin saber si tiene clases).
+  Future<void> _cambiarRol(String uid, String nombre, String correo, Rol? actual, int? clases) async {
+    if (clases == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Espera un momento a que carguen las clases e inténtalo de nuevo.')),
+      );
+      return;
+    }
+    final nuevo = await showDialog<Rol>(
+      context: context,
+      builder: (_) => _DialogoCambiarRol(
+        nombre: nombre,
+        correo: correo,
+        actual: actual,
+        error: (r) => errorCambioRol(
+          uid: uid,
+          miUid: _miUid ?? '',
+          actual: actual,
+          nuevo: r,
+          clases: clases,
+        ),
       ),
+    );
+    if (nuevo == null || !mounted) return;
+    _avisarSiFalla(cambiarRol(uid, correo, nuevo), 'No se cambió el rol de $correo');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$nombre ahora es ${nuevo.etiqueta}.')),
     );
   }
 
@@ -367,6 +486,111 @@ class _AdminHomeState extends State<AdminHome> {
     escritura.catchError((Object e) {
       avisos.showSnackBar(SnackBar(content: Text('$mensaje: $e')));
     });
+  }
+}
+
+enum _AccionUsuario { cambiarRol, quitarAcceso }
+
+/// Campo de búsqueda al principio de una lista; [alCambiar] vuelve a filtrar la pestaña.
+class _Buscador extends StatelessWidget {
+  const _Buscador({required this.controlador, required this.ayuda, required this.alCambiar});
+  final TextEditingController controlador;
+  final String ayuda;
+  final VoidCallback alCambiar;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: TextField(
+          controller: controlador,
+          onChanged: (_) => alCambiar(),
+          decoration: InputDecoration(
+            hintText: ayuda,
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: controlador.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Borrar búsqueda',
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      controlador.clear();
+                      alCambiar();
+                    },
+                  ),
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+      );
+}
+
+/// Elegir el rol nuevo de un usuario. Devuelve el [Rol] o `null` si se cancela. [error] da el motivo
+/// por el que no se le puede cambiar a ese rol (ver `errorCambioRol`).
+class _DialogoCambiarRol extends StatefulWidget {
+  const _DialogoCambiarRol({
+    required this.nombre,
+    required this.correo,
+    required this.actual,
+    required this.error,
+  });
+  final String nombre;
+  final String correo;
+  final Rol? actual;
+  final String? Function(Rol) error;
+
+  @override
+  State<_DialogoCambiarRol> createState() => _DialogoCambiarRolState();
+}
+
+class _DialogoCambiarRolState extends State<_DialogoCambiarRol> {
+  late Rol? _rol = widget.actual;
+
+  @override
+  Widget build(BuildContext context) {
+    final rol = _rol;
+    final cambia = rol != null && rol != widget.actual;
+    final motivo = cambia ? widget.error(rol) : null;
+    return AlertDialog(
+      title: const Text('Cambiar rol'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${widget.nombre}\n${widget.correo}'),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<Rol>(
+              initialValue: rol,
+              decoration: const InputDecoration(labelText: 'Rol'),
+              items: [
+                for (final r in Rol.values) DropdownMenuItem(value: r, child: Text(r.etiqueta)),
+              ],
+              onChanged: (r) => setState(() => _rol = r),
+            ),
+            if (rol != null)
+              Padding(padding: const EdgeInsets.only(top: 8), child: Text(rol.descripcion)),
+            if (motivo != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(motivo, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              ),
+            if (cambia && motivo == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Verá la pantalla de su nuevo rol de inmediato.'),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: cambia && motivo == null ? () => Navigator.pop(context, rol) : null,
+          child: const Text('Cambiar rol'),
+        ),
+      ],
+    );
   }
 }
 
