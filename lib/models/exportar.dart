@@ -14,9 +14,9 @@ const _nombresMes = [
 const _diasSemana = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 
 /// Letra de cada estado en los archivos exportados.
-const letraEstado = {presente: 'P', falta: 'F', justificada: 'J'};
+const letraEstado = {presente: 'P', falta: 'F', justificada: 'J', dual: 'D'};
 
-const _leyenda = 'P = Presente · F = Falta · J = Falta justificada';
+const _leyenda = 'P = Presente · F = Falta · J = Falta justificada · D = Dual';
 
 final _formatoFecha = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
@@ -44,14 +44,18 @@ String encabezadoDia(String fecha) => '${_diasSemana[DateTime.parse(fecha).weekd
 
 String _capital(String s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
 
-typedef Conteo = ({int presentes, int faltas, int justificadas});
+typedef Conteo = ({int presentes, int faltas, int justificadas, int duales});
 
-/// Asistencias entre días con registro (0 a 1); las faltas justificadas cuentan como falta.
-/// `null` si no hay ningún registro.
+/// Asistencias y días en dual entre días con registro (0 a 1); las faltas justificadas cuentan como
+/// falta. `null` si no hay ningún registro.
 double? porcentajeAsistencia(Conteo c) {
-  final total = c.presentes + c.faltas + c.justificadas;
-  return total == 0 ? null : c.presentes / total;
+  final total = c.presentes + c.faltas + c.justificadas + c.duales;
+  return total == 0 ? null : (c.presentes + c.duales) / total;
 }
+
+/// "Activo", "Baja", "Activo · Dual"…
+String _estatus(Fila f, Set<String> duales) =>
+    [f.baja ? 'Baja' : 'Activo', if (duales.contains(f.nl)) 'Dual'].join(' · ');
 
 /// Los pases de una clase en los meses elegidos, listos para exportar.
 class Registro {
@@ -63,6 +67,7 @@ class Registro {
     required this.alumnos,
     required Set<String> meses,
     this.subtitulo = '',
+    this.duales = const {},
   }) : _estados = {
           for (final f in columnasDelMes(pases.keys.where(_formatoFecha.hasMatch)))
             if (meses.contains(_mes(f))) f: pases[f]!,
@@ -79,6 +84,9 @@ class Registro {
 
   /// `grupos.alumnos`: `[{num, nombre, activo}]`.
   final List<dynamic> alumnos;
+
+  /// N.L de los alumnos en modo dual hoy (`dualesDe(grupos.duales)`), para el estatus del .csv.
+  final Set<String> duales;
 
   /// Fecha → estados, en orden de fecha.
   final Map<String, Map<String, dynamic>> _estados;
@@ -97,7 +105,7 @@ class Registro {
   }
 
   Conteo conteo(String nl, List<String> fechas) {
-    var p = 0, f = 0, j = 0;
+    var p = 0, f = 0, j = 0, d = 0;
     for (final fecha in fechas) {
       switch (estado(fecha, nl)) {
         case presente:
@@ -106,9 +114,11 @@ class Registro {
           f++;
         case justificada:
           j++;
+        case dual:
+          d++;
       }
     }
-    return (presentes: p, faltas: f, justificadas: j);
+    return (presentes: p, faltas: f, justificadas: j, duales: d);
   }
 }
 
@@ -135,13 +145,13 @@ String _sinFormula(String s) => RegExp(r'^[=+\-@\t\r]').hasMatch(s) ? "'$s" : s;
 String _campoCsv(String s) =>
     RegExp(r'[",\r\n]').hasMatch(s) ? '"${s.replaceAll('"', '""')}"' : s;
 
-/// Una sola tabla sin formato: N.L, nombre, estatus, una columna por fecha (P, F o J; vacío = sin
+/// Una sola tabla sin formato: N.L, nombre, estatus, una columna por fecha (P, F, J o D; vacío = sin
 /// registro) y los totales del periodo. Separado por comas, fin de línea CRLF y con BOM para que
 /// Excel lea bien los acentos.
 String csvRegistro(Registro r) {
   final fechas = r.fechas;
   final lineas = <List<String>>[
-    ['N.L', 'Nombre', 'Estatus', ...fechas, 'Asistencias', 'Faltas', 'Faltas justificadas', '% asistencia'],
+    ['N.L', 'Nombre', 'Estatus', ...fechas, 'Asistencias', 'Faltas', 'Faltas justificadas', 'Dual', '% asistencia'],
   ];
   for (final f in r.filas(fechas)) {
     final c = r.conteo(f.nl, fechas);
@@ -149,11 +159,12 @@ String csvRegistro(Registro r) {
     lineas.add([
       _sinFormula(f.nl),
       _sinFormula(f.nombre),
-      f.baja ? 'Baja' : 'Activo',
+      _estatus(f, r.duales),
       for (final fecha in fechas) letraEstado[r.estado(fecha, f.nl)] ?? '',
       '${c.presentes}',
       '${c.faltas}',
       '${c.justificadas}',
+      '${c.duales}',
       pct == null ? '' : (pct * 100).toStringAsFixed(1),
     ]);
   }
@@ -191,6 +202,7 @@ CeldaXlsx _celdaEstado(int? e) => switch (e) {
       presente => const CeldaXlsx.texto('P', EstiloXlsx.presente),
       falta => const CeldaXlsx.texto('F', EstiloXlsx.falta),
       justificada => const CeldaXlsx.texto('J', EstiloXlsx.justificada),
+      dual => const CeldaXlsx.texto('D', EstiloXlsx.dual),
       _ => const CeldaXlsx.vacia(),
     };
 
@@ -202,8 +214,8 @@ String _dias(int n) => n == 1 ? '1 día con pase' : '$n días con pase';
 HojaXlsx _hojaMes(Registro r, String mes) {
   final fechas = r.fechasDe(mes);
   final filas = r.filas(fechas);
-  final colTotales = 2 + fechas.length; // Asistencias, Faltas, Justificadas, % asistencia
-  final ultimaCol = colTotales + 3;
+  final colTotales = 2 + fechas.length; // Asistencias, Faltas, Justificadas, Dual, % asistencia
+  final ultimaCol = colTotales + 4;
   final primera = _filaEncabezado + 1;
   final ultima = primera + filas.length - 1;
 
@@ -213,7 +225,7 @@ HojaXlsx _hojaMes(Registro r, String mes) {
     final fila = primera + i;
     final dias = '${celdaXlsx(fila, 2)}:${celdaXlsx(fila, colTotales - 1)}';
     final p = celdaXlsx(fila, colTotales);
-    final j = celdaXlsx(fila, colTotales + 2);
+    final d = celdaXlsx(fila, colTotales + 3);
     final c = r.conteo(f.nl, fechas);
     datos.add([
       _celdaNl(f.nl),
@@ -222,7 +234,8 @@ HojaXlsx _hojaMes(Registro r, String mes) {
       CeldaXlsx.formula('COUNTIF($dias,"P")', c.presentes),
       CeldaXlsx.formula('COUNTIF($dias,"F")', c.faltas),
       CeldaXlsx.formula('COUNTIF($dias,"J")', c.justificadas),
-      CeldaXlsx.formula('IF(SUM($p:$j)=0,"",$p/SUM($p:$j))', porcentajeAsistencia(c) ?? '', EstiloXlsx.porcentaje),
+      CeldaXlsx.formula('COUNTIF($dias,"D")', c.duales),
+      CeldaXlsx.formula('IF(SUM($p:$d)=0,"",($p+$d)/SUM($p:$d))', porcentajeAsistencia(c) ?? '', EstiloXlsx.porcentaje),
     ]);
   }
 
@@ -236,7 +249,7 @@ HojaXlsx _hojaMes(Registro r, String mes) {
         const CeldaXlsx.texto('N.L', EstiloXlsx.encabezado),
         const CeldaXlsx.texto('Nombre', EstiloXlsx.encabezado),
         for (final f in fechas) CeldaXlsx.texto(encabezadoDia(f), EstiloXlsx.encabezado),
-        for (final t in ['Asistencias', 'Faltas', 'Justificadas', '% asistencia']) CeldaXlsx.texto(t, EstiloXlsx.total),
+        for (final t in ['Asistencias', 'Faltas', 'Justificadas', 'Dual', '% asistencia']) CeldaXlsx.texto(t, EstiloXlsx.total),
       ],
       ...datos,
       if (filas.isNotEmpty)
@@ -258,7 +271,8 @@ HojaXlsx _hojaMes(Registro r, String mes) {
       colTotales: 12,
       colTotales + 1: 9,
       colTotales + 2: 12,
-      colTotales + 3: 12,
+      colTotales + 3: 8,
+      colTotales + 4: 12,
     },
     combinadas: [for (var i = 0; i < 3; i++) 'A${i + 1}:${celdaXlsx(i, ultimaCol)}'],
     fijarFilas: _filaEncabezado + 1,
@@ -274,6 +288,7 @@ List<CeldaXlsx?> _filaResumen(Registro r, Fila f, List<String> fechas, List<Stri
     CeldaXlsx.numero(c.presentes),
     CeldaXlsx.numero(c.faltas),
     CeldaXlsx.numero(c.justificadas),
+    CeldaXlsx.numero(c.duales),
     _celdaPorcentaje(porcentajeAsistencia(c)),
     for (final m in meses) _celdaPorcentaje(porcentajeAsistencia(r.conteo(f.nl, r.fechasDe(m)))),
   ];
@@ -281,7 +296,7 @@ List<CeldaXlsx?> _filaResumen(Registro r, Fila f, List<String> fechas, List<Stri
 
 HojaXlsx _hojaResumen(Registro r, List<String> meses) {
   final fechas = r.fechas;
-  final ultimaCol = 5 + meses.length;
+  final ultimaCol = 6 + meses.length;
   return HojaXlsx(
     nombre: 'Resumen',
     filas: [
@@ -294,14 +309,14 @@ HojaXlsx _hojaResumen(Registro r, List<String> meses) {
       ],
       [
         const CeldaXlsx.texto(
-          '% asistencia = asistencias entre días con registro; la falta justificada cuenta como falta',
+          '% asistencia = (asistencias + dual) entre días con registro; la falta justificada cuenta como falta',
           EstiloXlsx.nota,
         ),
       ],
       [
         const CeldaXlsx.texto('N.L', EstiloXlsx.encabezado),
         const CeldaXlsx.texto('Nombre', EstiloXlsx.encabezado),
-        for (final t in ['Asistencias', 'Faltas', 'Justificadas', '% asistencia']) CeldaXlsx.texto(t, EstiloXlsx.total),
+        for (final t in ['Asistencias', 'Faltas', 'Justificadas', 'Dual', '% asistencia']) CeldaXlsx.texto(t, EstiloXlsx.total),
         for (final m in meses) CeldaXlsx.texto('% ${_mesCorto(m)}', EstiloXlsx.encabezado),
       ],
       for (final f in r.filas(fechas)) _filaResumen(r, f, fechas, meses),
@@ -312,8 +327,9 @@ HojaXlsx _hojaResumen(Registro r, List<String> meses) {
       2: 12,
       3: 9,
       4: 12,
-      5: 12,
-      for (var i = 0; i < meses.length; i++) 6 + i: 13,
+      5: 8,
+      6: 12,
+      for (var i = 0; i < meses.length; i++) 7 + i: 13,
     },
     combinadas: [for (var i = 0; i < 3; i++) 'A${i + 1}:${celdaXlsx(i, ultimaCol)}'],
     fijarFilas: _filaEncabezado + 1,
@@ -323,7 +339,7 @@ HojaXlsx _hojaResumen(Registro r, List<String> meses) {
 
 // ── Grupo completo ───────────────────────────────────────────────────────────────────────────────
 // El admin exporta la asistencia de un grupo con todas sus clases: una fila por alumno y, por cada
-// clase, sus asistencias, faltas y faltas justificadas, más los totales del grupo. Las fechas se
+// clase, sus asistencias, faltas, faltas justificadas y días en dual, más los totales del grupo. Las fechas se
 // resumen (no hay una columna por día): para el detalle día por día está el registro de cada clase.
 
 /// Una clase del grupo con sus pases: fecha "AAAA-MM-DD" → `pases.estados` de ese día.
@@ -351,11 +367,12 @@ class RegistroGrupo {
     required this.alumnos,
     required List<ClaseDelGrupo> delGrupo,
     required Set<String> meses,
+    this.duales = const {},
   }) {
     final ordenadas = [...delGrupo]
       ..sort((a, b) => '${a.materia}\n${a.profesor}'.toLowerCase().compareTo('${b.materia}\n${b.profesor}'.toLowerCase()));
     for (final c in ordenadas) {
-      final r = Registro(titulo: c.materia, pases: c.pases, alumnos: alumnos, meses: meses);
+      final r = Registro(titulo: c.materia, pases: c.pases, alumnos: alumnos, meses: meses, duales: duales);
       if (r.fechas.isEmpty) continue;
       final profe = c.profesor.trim();
       clases.add(ColumnaClase(
@@ -370,6 +387,9 @@ class RegistroGrupo {
 
   /// `grupos.alumnos`: `[{num, nombre, activo}]`.
   final List<dynamic> alumnos;
+
+  /// N.L de los alumnos en modo dual hoy, para el estatus del .csv.
+  final Set<String> duales;
 
   /// Las clases con pases en el periodo, por materia.
   final List<ColumnaClase> clases = [];
@@ -390,19 +410,20 @@ class RegistroGrupo {
 
   /// La suma de todas las clases.
   Conteo total(String nl) {
-    var p = 0, f = 0, j = 0;
+    var p = 0, f = 0, j = 0, d = 0;
     for (final c in clases) {
       final k = conteoDe(nl, c);
       p += k.presentes;
       f += k.faltas;
       j += k.justificadas;
+      d += k.duales;
     }
-    return (presentes: p, faltas: f, justificadas: j);
+    return (presentes: p, faltas: f, justificadas: j, duales: d);
   }
 }
 
-/// Una sola tabla sin formato: N.L, nombre, estatus, por cada clase sus asistencias, faltas y
-/// justificadas, y los totales del grupo con el % de asistencia. Mismo formato que [csvRegistro]
+/// Una sola tabla sin formato: N.L, nombre, estatus, por cada clase sus asistencias, faltas,
+/// justificadas y dual, y los totales del grupo con el % de asistencia. Mismo formato que [csvRegistro]
 /// (UTF-8 con BOM, comas y CRLF).
 String csvGrupo(RegistroGrupo g) {
   final lineas = <List<String>>[
@@ -414,10 +435,12 @@ String csvGrupo(RegistroGrupo g) {
         '${c.etiqueta} - Asistencias',
         '${c.etiqueta} - Faltas',
         '${c.etiqueta} - Justificadas',
+        '${c.etiqueta} - Dual',
       ],
       'Total asistencias',
       'Total faltas',
       'Total justificadas',
+      'Total dual',
       '% asistencia',
     ],
   ];
@@ -427,15 +450,17 @@ String csvGrupo(RegistroGrupo g) {
     lineas.add([
       _sinFormula(f.nl),
       _sinFormula(f.nombre),
-      f.baja ? 'Baja' : 'Activo',
+      _estatus(f, g.duales),
       for (final c in g.clases) ...[
         '${g.conteoDe(f.nl, c).presentes}',
         '${g.conteoDe(f.nl, c).faltas}',
         '${g.conteoDe(f.nl, c).justificadas}',
+        '${g.conteoDe(f.nl, c).duales}',
       ],
       '${t.presentes}',
       '${t.faltas}',
       '${t.justificadas}',
+      '${t.duales}',
       pct == null ? '' : (pct * 100).toStringAsFixed(1),
     ]);
   }
@@ -449,10 +474,10 @@ Uint8List xlsxGrupo(RegistroGrupo g) {
   if (g.clases.isEmpty) throw ArgumentError('No hay pases en los meses elegidos.');
   final filas = g.filas;
   final n = g.clases.length;
-  final colTotales = 2 + 3 * n; // Asistencias, Faltas, Justificadas, % asistencia
-  final ultimaCol = colTotales + 3;
+  final colTotales = 2 + 4 * n; // Asistencias, Faltas, Justificadas, Dual, % asistencia
+  final ultimaCol = colTotales + 4;
   const filaGrupos = 3; // nombres de las clases
-  const filaTitulos = 4; // Asist., Faltas, Just.
+  const filaTitulos = 4; // Asist., Faltas, Just., Dual
   final primera = filaTitulos + 1;
 
   final datos = <List<CeldaXlsx?>>[];
@@ -461,9 +486,9 @@ Uint8List xlsxGrupo(RegistroGrupo g) {
     final fila = primera + i;
     final t = g.total(f.nl);
     String suma(int desplazamiento) =>
-        [for (var k = 0; k < n; k++) celdaXlsx(fila, 2 + 3 * k + desplazamiento)].join('+');
+        [for (var k = 0; k < n; k++) celdaXlsx(fila, 2 + 4 * k + desplazamiento)].join('+');
     final p = celdaXlsx(fila, colTotales);
-    final j = celdaXlsx(fila, colTotales + 2);
+    final d = celdaXlsx(fila, colTotales + 3);
     datos.add([
       _celdaNl(f.nl),
       _celdaNombre(f),
@@ -471,11 +496,13 @@ Uint8List xlsxGrupo(RegistroGrupo g) {
         CeldaXlsx.numero(g.conteoDe(f.nl, c).presentes),
         CeldaXlsx.numero(g.conteoDe(f.nl, c).faltas),
         CeldaXlsx.numero(g.conteoDe(f.nl, c).justificadas),
+        CeldaXlsx.numero(g.conteoDe(f.nl, c).duales),
       ],
       CeldaXlsx.formula(suma(0), t.presentes),
       CeldaXlsx.formula(suma(1), t.faltas),
       CeldaXlsx.formula(suma(2), t.justificadas),
-      CeldaXlsx.formula('IF(SUM($p:$j)=0,"",$p/SUM($p:$j))', porcentajeAsistencia(t) ?? '', EstiloXlsx.porcentaje),
+      CeldaXlsx.formula(suma(3), t.duales),
+      CeldaXlsx.formula('IF(SUM($p:$d)=0,"",($p+$d)/SUM($p:$d))', porcentajeAsistencia(t) ?? '', EstiloXlsx.porcentaje),
     ]);
   }
 
@@ -492,7 +519,7 @@ Uint8List xlsxGrupo(RegistroGrupo g) {
       ],
       [
         const CeldaXlsx.texto(
-          '% asistencia = asistencias entre pases registrados de todas las clases; la falta justificada cuenta como falta',
+          '% asistencia = (asistencias + dual) entre pases registrados de todas las clases; la falta justificada cuenta como falta',
           EstiloXlsx.nota,
         ),
       ],
@@ -503,8 +530,10 @@ Uint8List xlsxGrupo(RegistroGrupo g) {
           CeldaXlsx.texto(c.etiqueta, EstiloXlsx.encabezado),
           const CeldaXlsx.vacia(EstiloXlsx.encabezado),
           const CeldaXlsx.vacia(EstiloXlsx.encabezado),
+          const CeldaXlsx.vacia(EstiloXlsx.encabezado),
         ],
         const CeldaXlsx.texto('Todo el grupo', EstiloXlsx.total),
+        const CeldaXlsx.vacia(EstiloXlsx.total),
         const CeldaXlsx.vacia(EstiloXlsx.total),
         const CeldaXlsx.vacia(EstiloXlsx.total),
         const CeldaXlsx.vacia(EstiloXlsx.total),
@@ -516,8 +545,9 @@ Uint8List xlsxGrupo(RegistroGrupo g) {
           const CeldaXlsx.texto('Asist.', EstiloXlsx.encabezado),
           const CeldaXlsx.texto('Faltas', EstiloXlsx.encabezado),
           const CeldaXlsx.texto('Just.', EstiloXlsx.encabezado),
+          const CeldaXlsx.texto('Dual', EstiloXlsx.encabezado),
         ],
-        for (final t in ['Asistencias', 'Faltas', 'Justificadas', '% asistencia']) CeldaXlsx.texto(t, EstiloXlsx.total),
+        for (final t in ['Asistencias', 'Faltas', 'Justificadas', 'Dual', '% asistencia']) CeldaXlsx.texto(t, EstiloXlsx.total),
       ],
       ...datos,
     ],
@@ -528,11 +558,12 @@ Uint8List xlsxGrupo(RegistroGrupo g) {
       colTotales: 12,
       colTotales + 1: 9,
       colTotales + 2: 12,
-      colTotales + 3: 12,
+      colTotales + 3: 8,
+      colTotales + 4: 12,
     },
     combinadas: [
       for (var i = 0; i < 3; i++) 'A${i + 1}:${celdaXlsx(i, ultimaCol)}',
-      for (var k = 0; k < n; k++) '${celdaXlsx(filaGrupos, 2 + 3 * k)}:${celdaXlsx(filaGrupos, 4 + 3 * k)}',
+      for (var k = 0; k < n; k++) '${celdaXlsx(filaGrupos, 2 + 4 * k)}:${celdaXlsx(filaGrupos, 5 + 4 * k)}',
       '${celdaXlsx(filaGrupos, colTotales)}:${celdaXlsx(filaGrupos, ultimaCol)}',
     ],
     fijarFilas: filaTitulos + 1,

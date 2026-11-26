@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/clase.dart' show profeYSalon;
+import '../models/grupo.dart' show alumnosDe;
 import '../models/orden.dart';
 import '../models/pase.dart';
 import '../services/pases.dart';
+import 'acciones_grupo.dart' show BotonDual;
 import 'inicio.dart';
 import 'pase_mensual.dart';
 
@@ -246,6 +248,8 @@ class _GrupoDetalle extends StatelessWidget {
                 const Padding(padding: EdgeInsets.only(top: 8), child: Text('No hay otras clases con pase este día.'))
               else
                 for (final p in otras) _otraClase(context, p, alumnos),
+              const Divider(height: 32),
+              _alumnos(alumnos, dualesDe(grupo?.data()['duales'])),
             ],
           ),
           bottomNavigationBar: SafeArea(
@@ -335,6 +339,26 @@ class _GrupoDetalle extends StatelessWidget {
       children: [
         ..._lista(context, 'Faltas sin justificar', faltas),
         ..._lista(context, 'Faltas justificadas', justificadas),
+      ],
+    );
+  }
+
+  /// Alumnos activos con el botón para activar o quitar el modo dual.
+  Widget _alumnos(List<dynamic> alumnos, Set<String> duales) {
+    final activos = alumnosDe(alumnos).where((a) => a.activo).toList();
+    final n = activos.where((a) => duales.contains('${a.num}')).length;
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      title: Text('Alumnos (${activos.length})'),
+      subtitle: Text(n == 1 ? '1 en modo dual' : '$n en modo dual'),
+      children: [
+        for (final a in activos)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: SizedBox(width: 32, child: Text('${a.num}')),
+            title: Text(a.nombre),
+            trailing: BotonDual(grupoId: grupoId, num: a.num, nombre: a.nombre, esDual: duales.contains('${a.num}')),
+          ),
       ],
     );
   }

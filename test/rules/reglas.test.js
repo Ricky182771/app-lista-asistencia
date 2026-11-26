@@ -9,6 +9,8 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -211,6 +213,36 @@ describe('grupos y clases', () => {
     await assertFails(setDoc(doc(db, 'grupos/g3'), { nombre: '1C', profesores: [], alumnos: [] }));
     await assertFails(setDoc(doc(db, 'clases/orden_g1'), { profesorUid: 'orden', grupoId: 'g1' }));
     await assertFails(updateDoc(doc(db, `pases/profe_g1_${HACE_5}`), { 'estados.1': 1 }));
+  });
+});
+
+describe('modo dual', () => {
+  test('admin y orden activan y quitan duales', async () => {
+    await assertSucceeds(updateDoc(doc(como('orden'), 'grupos/g1'), { duales: arrayUnion(3) }));
+    await assertSucceeds(updateDoc(doc(como('admin'), 'grupos/g1'), { duales: arrayUnion(5) }));
+    await assertSucceeds(updateDoc(doc(como('orden'), 'grupos/g1'), { duales: arrayRemove(3) }));
+    const g1 = await getDoc(doc(como('admin'), 'grupos/g1'));
+    assert.deepEqual(g1.data().duales, [5]);
+  });
+
+  test('orden no toca nada más que duales, ni pone algo que no es lista', async () => {
+    const db = como('orden');
+    await assertFails(updateDoc(doc(db, 'grupos/g1'), { duales: arrayUnion(3), nombre: 'X' }));
+    await assertFails(updateDoc(doc(db, 'grupos/g1'), { alumnos: [] }));
+    await assertFails(updateDoc(doc(db, 'grupos/g1'), { duales: 3 }));
+    await assertFails(setDoc(doc(db, 'grupos/g3'), { duales: [] }));
+    await assertFails(deleteDoc(doc(db, 'grupos/g1')));
+  });
+
+  test('el profe no cambia duales', async () => {
+    await assertFails(updateDoc(doc(como('profe'), 'grupos/g1'), { duales: arrayUnion(3) }));
+  });
+
+  test('un pase con estado dual (3) entra y se edita', async () => {
+    const db = como('profe');
+    await assertSucceeds(setDoc(doc(db, `pases/profe_g1_${fecha(0)}`),
+      { ...pase('profe_g1', 'g1', 'profe', fecha(0)), estados: { 1: 3, 2: 0 } }));
+    await assertSucceeds(updateDoc(doc(db, `pases/profe_g1_${HACE_5}`), { 'estados.1': 3 }));
   });
 });
 

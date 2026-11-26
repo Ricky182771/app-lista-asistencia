@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../models/clase.dart';
 import '../models/exportar.dart';
 import '../models/grupo.dart';
+import '../models/pase.dart' show dualesDe;
 import '../models/xlsx.dart' show mimeXlsx;
 import '../services/clases.dart';
 import '../services/pases.dart' show pasesDelGrupo;
@@ -137,6 +138,7 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
       final registro = RegistroGrupo(
         titulo: '${widget.nombreGrupo} · Grupo completo',
         alumnos: (widget.grupo.data()?['alumnos'] as List?) ?? const [],
+        duales: dualesDe(widget.grupo.data()?['duales']),
         delGrupo: delGrupo,
         meses: eleccion.meses,
       );

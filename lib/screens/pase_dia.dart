@@ -23,6 +23,7 @@ class PaseDia extends StatefulWidget {
 class _PaseDiaState extends State<PaseDia> {
   final _uid = FirebaseAuth.instance.currentUser!.uid;
   late final _salon = TextEditingController(text: '${widget.clase.data()?['salon'] ?? ''}');
+  late final _duales = dualesDe(widget.grupo.data()?['duales']);
   String _fecha = fechaLocal(DateTime.now());
   /// N.L → estado tocado en pantalla y aún sin enviar o guardar.
   final _cambios = <String, int>{};
@@ -69,9 +70,9 @@ class _PaseDiaState extends State<PaseDia> {
     });
   }
 
-  /// Estados con los que se comparan los cambios: los del pase, o todos presentes si es nuevo.
+  /// Estados con los que se comparan los cambios: los del pase, o los iniciales si es nuevo.
   Map<String, dynamic> _guardados(Map<String, dynamic>? pase) => pase == null
-      ? estadosIniciales((widget.grupo.data()?['alumnos'] as List?) ?? const [])
+      ? estadosIniciales((widget.grupo.data()?['alumnos'] as List?) ?? const [], _duales)
       : Map<String, dynamic>.from(pase['estados'] as Map? ?? const {});
 
   /// Lo mismo que habilita "Guardar cambios": tocar un alumno y regresarlo a como estaba no cuenta.
@@ -218,7 +219,7 @@ class _PaseDiaState extends State<PaseDia> {
               ),
             ),
           SizedBox(height: compacto ? 8 : 12),
-          LeyendaEstados(compacta: compacto),
+          LeyendaEstados(compacta: compacto, conDual: _duales.isNotEmpty),
         ],
       ),
     );
@@ -284,11 +285,14 @@ class _PaseDiaState extends State<PaseDia> {
       title: Text(f.nombre, style: compacto ? texto.bodyMedium : null),
       subtitle: f.baja ? const Text('Dado de baja') : null,
       trailing: CeldaEstado(estado: actual),
-      // Un alumno sin registro en un pase ya enviado empieza en presente al tocarlo.
-      onTap: editable
-          ? () => setState(() => _cambios[f.nl] = actual == null ? presente : siguienteEstado(actual))
-          : null,
+      onTap: editable ? () => setState(() => _cambios[f.nl] = _siguiente(f.nl, actual)) : null,
     );
+  }
+
+  /// Un alumno sin registro en un pase ya enviado empieza en presente (o dual) al tocarlo.
+  int _siguiente(String nl, int? actual) {
+    final esDual = _duales.contains(nl);
+    return actual == null ? (esDual ? dual : presente) : siguienteEstado(actual, esDual: esDual);
   }
 
   void _enviar(Map<String, dynamic> iniciales) {

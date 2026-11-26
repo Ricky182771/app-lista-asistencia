@@ -7,9 +7,23 @@ void main() {
     expect(siguienteEstado(presente), falta);
     expect(siguienteEstado(falta), justificada);
     expect(siguienteEstado(justificada), presente);
-    for (final v in [-1, 3, 99]) {
+    for (final v in [-1, dual, 99]) {
       expect(siguienteEstado(v), presente, reason: '$v');
     }
+  });
+
+  test('siguienteEstado dual: 3 → 0 → 1 → 2 → 3', () {
+    expect(siguienteEstado(dual, esDual: true), presente);
+    expect(siguienteEstado(presente, esDual: true), falta);
+    expect(siguienteEstado(falta, esDual: true), justificada);
+    expect(siguienteEstado(justificada, esDual: true), dual);
+    expect(siguienteEstado(99, esDual: true), presente);
+  });
+
+  test('dualesDe: N.L en texto, acepta 3.0 e ignora lo que no es número', () {
+    expect(dualesDe([1, 3.0, 'x', null]), {'1', '3'});
+    expect(dualesDe(null), isEmpty);
+    expect(dualesDe('1'), isEmpty);
   });
 
   test('fechaLocal rellena con ceros', () {
@@ -56,8 +70,12 @@ void main() {
   ];
 
   test('estadosIniciales: solo activos, todos presentes, llaves en texto', () {
-    expect(estadosIniciales(alumnos), {'1': presente, '10': presente, '3': presente});
-    expect(estadosIniciales(const []), isEmpty);
+    expect(estadosIniciales(alumnos, const {}), {'1': presente, '10': presente, '3': presente});
+    expect(estadosIniciales(const [], const {}), isEmpty);
+  });
+
+  test('estadosIniciales: los duales activos empiezan en dual; un dual de baja no entra', () {
+    expect(estadosIniciales(alumnos, const {'3', '2'}), {'1': presente, '10': presente, '3': dual});
   });
 
   group('filasDelPase', () {
@@ -85,7 +103,7 @@ void main() {
   });
 
   test('camposEditados contra estadosIniciales: pase nuevo tocado y regresado a presente no tiene cambios', () {
-    final iniciales = estadosIniciales(alumnos);
+    final iniciales = estadosIniciales(alumnos, const {});
     expect(camposEditados(iniciales, {'1': presente, '3': presente}), isEmpty);
     expect(camposEditados(iniciales, {'1': presente, '3': falta}), {'estados.3': falta});
   });

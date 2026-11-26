@@ -54,6 +54,13 @@ Future<void> guardarAlumnos(String id, List<Alumno> alumnos) =>
       'alumnos': [for (final a in alumnos) a.toMap()],
     });
 
+/// Activa o quita el modo dual del N.L [num]. Solo toca `duales` (aparte de `alumnos`, para que
+/// reemplazar la lista no lo borre); el encargado de orden también puede hacerlo.
+/// Sin `await` a propósito (ver [crearGrupo]).
+Future<void> cambiarDual(String id, int num, bool esDual) => _db.doc('grupos/$id').update({
+      'duales': esDual ? FieldValue.arrayUnion([num]) : FieldValue.arrayRemove([num]),
+    });
+
 /// Cambia solo el nombre que se muestra. El ID no cambia (de él dependen `clases.grupoId` y
 /// `pases.grupoId`), así que un grupo renombrado conserva el ID de su nombre original.
 /// Sin `await` a propósito (ver [crearGrupo]). Quien llama revisa antes con `errorRenombrar`.

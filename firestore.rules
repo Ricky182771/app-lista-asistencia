@@ -47,6 +47,10 @@ service cloud.firestore {
       allow read: if isRole('admin') || isRole('orden')
         || (isRole('profesor') && request.auth.uid in resource.data.profesores);
       allow write: if isRole('admin');
+      // Modo dual: el encargado de orden activa o quita alumnos en `duales` y no toca nada más.
+      allow update: if isRole('orden')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['duales'])
+        && request.resource.data.duales is list;
     }
 
     match /clases/{cid} {

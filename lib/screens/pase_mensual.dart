@@ -126,9 +126,12 @@ class _PaseMensualState extends State<PaseMensual> {
         _escuchar();
       });
 
+  Set<String> get _duales => dualesDe(widget.grupo.data()?['duales']);
+
   /// Un `update()` de ese solo campo, sin `await` (ver CLAUDE.md).
   void _tocar(String paseId, String fecha, String nl, int? actual) {
-    final nuevo = actual == null ? presente : siguienteEstado(actual);
+    final esDual = _duales.contains(nl);
+    final nuevo = actual == null ? (esDual ? dual : presente) : siguienteEstado(actual, esDual: esDual);
     avisarSiFalla(context, guardarCambios(paseId, {'estados.$nl': nuevo}),
         'No se guardó el cambio del $fecha');
   }
@@ -163,6 +166,7 @@ class _PaseMensualState extends State<PaseMensual> {
         subtitulo: widget.subtitulo,
         pases: pases,
         alumnos: (widget.grupo.data()?['alumnos'] as List?) ?? const [],
+        duales: _duales,
         meses: eleccion.meses,
       );
       final nombre = nombreArchivo(widget.titulo, registro.meses, eleccion.xlsx ? 'xlsx' : 'csv');
@@ -253,7 +257,7 @@ class _PaseMensualState extends State<PaseMensual> {
               runSpacing: compacto ? 4 : 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                LeyendaEstados(compacta: compacto),
+                LeyendaEstados(compacta: compacto, conDual: _duales.isNotEmpty),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

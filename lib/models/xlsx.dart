@@ -22,6 +22,7 @@ enum EstiloXlsx {
   numero,
   porcentaje,
   total,
+  dual,
 }
 
 /// Una celda: texto, número o fórmula (con su resultado ya calculado, para los visores que no
@@ -244,10 +245,11 @@ const _relsRaizXml = '$_cabeceraXml'
     '<Relationship Id="rId1" Type="$_nsR/officeDocument" Target="xl/workbook.xml"/>'
     '</Relationships>';
 
-// Mismos colores que CeldaEstado en la app: verde presente, rojo falta, amarillo pastel justificada.
+// Mismos colores que CeldaEstado en la app: verde presente, rojo falta, amarillo pastel justificada,
+// azul dual.
 const _estilos = '$_cabeceraXml'
     '<styleSheet xmlns="$_ns">'
-    '<fonts count="9">'
+    '<fonts count="10">'
     '<font><sz val="11"/><name val="Calibri"/></font>' // 0 normal
     '<font><b/><sz val="14"/><name val="Calibri"/></font>' // 1 título
     '<font><i/><sz val="10"/><color rgb="FF616161"/><name val="Calibri"/></font>' // 2 nota
@@ -257,8 +259,9 @@ const _estilos = '$_cabeceraXml'
     '<font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>' // 6 justificada
     '<font><i/><sz val="11"/><color rgb="FF757575"/><name val="Calibri"/></font>' // 7 baja
     '<font><b/><sz val="11"/><color rgb="FF1A237E"/><name val="Calibri"/></font>' // 8 total
+    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' // 9 dual
     '</fonts>'
-    '<fills count="7">'
+    '<fills count="8">'
     '<fill><patternFill patternType="none"/></fill>'
     '<fill><patternFill patternType="gray125"/></fill>'
     '<fill><patternFill patternType="solid"><fgColor rgb="FF3F51B5"/><bgColor indexed="64"/></patternFill></fill>' // 2
@@ -266,6 +269,7 @@ const _estilos = '$_cabeceraXml'
     '<fill><patternFill patternType="solid"><fgColor rgb="FFFBE0E0"/><bgColor indexed="64"/></patternFill></fill>' // 4
     '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF4BF"/><bgColor indexed="64"/></patternFill></fill>' // 5
     '<fill><patternFill patternType="solid"><fgColor rgb="FFE8EAF6"/><bgColor indexed="64"/></patternFill></fill>' // 6
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF1565C0"/><bgColor indexed="64"/></patternFill></fill>' // 7
     '</fills>'
     '<borders count="2">'
     '<border><left/><right/><top/><bottom/><diagonal/></border>'
@@ -274,7 +278,7 @@ const _estilos = '$_cabeceraXml'
     '<diagonal/></border>'
     '</borders>'
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    '<cellXfs count="13">'
+    '<cellXfs count="14">'
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' // normal
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' // titulo
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' // nota
@@ -296,6 +300,8 @@ const _estilos = '$_cabeceraXml'
     'applyAlignment="1"><alignment horizontal="center"/></xf>' // porcentaje
     '<xf numFmtId="0" fontId="8" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" '
     'applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' // total
+    '<xf numFmtId="0" fontId="9" fillId="7" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" '
+    'applyAlignment="1"><alignment horizontal="center"/></xf>' // dual
     '</cellXfs>'
     '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     '</styleSheet>';
