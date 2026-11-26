@@ -320,3 +320,223 @@ HojaXlsx _hojaResumen(Registro r, List<String> meses) {
     fijarColumnas: 2,
   );
 }
+
+// ── Grupo completo ───────────────────────────────────────────────────────────────────────────────
+// El admin exporta la asistencia de un grupo con todas sus clases: una fila por alumno y, por cada
+// clase, sus asistencias, faltas y faltas justificadas, más los totales del grupo. Las fechas se
+// resumen (no hay una columna por día): para el detalle día por día está el registro de cada clase.
+
+/// Una clase del grupo con sus pases: fecha "AAAA-MM-DD" → `pases.estados` de ese día.
+typedef ClaseDelGrupo = ({
+  String materia,
+  String profesor,
+  String salon,
+  Map<String, Map<String, dynamic>> pases,
+});
+
+/// Una clase con pases en el periodo elegido.
+class ColumnaClase {
+  const ColumnaClase({required this.etiqueta, required this.registro});
+
+  /// "Matemáticas (Prof. Ana López)", lo que encabeza sus columnas.
+  final String etiqueta;
+  final Registro registro;
+}
+
+/// Las clases de un grupo en los meses elegidos. Las clases sin ningún pase en esos meses no tienen
+/// columnas.
+class RegistroGrupo {
+  RegistroGrupo({
+    required this.titulo,
+    required this.alumnos,
+    required List<ClaseDelGrupo> delGrupo,
+    required Set<String> meses,
+  }) {
+    final ordenadas = [...delGrupo]
+      ..sort((a, b) => '${a.materia}\n${a.profesor}'.toLowerCase().compareTo('${b.materia}\n${b.profesor}'.toLowerCase()));
+    for (final c in ordenadas) {
+      final r = Registro(titulo: c.materia, pases: c.pases, alumnos: alumnos, meses: meses);
+      if (r.fechas.isEmpty) continue;
+      final profe = c.profesor.trim();
+      clases.add(ColumnaClase(
+        etiqueta: profe.isEmpty ? c.materia : '${c.materia} (Prof. $profe)',
+        registro: r,
+      ));
+    }
+  }
+
+  /// "Grupo · Grupo completo", para el título y el nombre del archivo.
+  final String titulo;
+
+  /// `grupos.alumnos`: `[{num, nombre, activo}]`.
+  final List<dynamic> alumnos;
+
+  /// Las clases con pases en el periodo, por materia.
+  final List<ColumnaClase> clases = [];
+
+  /// "AAAA-MM" con al menos un pase de alguna clase, en orden.
+  List<String> get meses => {for (final c in clases) ...c.registro.meses}.toList()..sort();
+
+  /// Días distintos con pase de alguna clase.
+  int get diasConPase => {for (final c in clases) ...c.registro.fechas}.length;
+
+  /// Activos más quien tenga registro en alguna clase aunque ya esté de baja.
+  List<Fila> get filas => filasDelPase(alumnos, {
+        for (final c in clases)
+          for (final f in c.registro.filas(c.registro.fechas)) f.nl: 0,
+      });
+
+  Conteo conteoDe(String nl, ColumnaClase c) => c.registro.conteo(nl, c.registro.fechas);
+
+  /// La suma de todas las clases.
+  Conteo total(String nl) {
+    var p = 0, f = 0, j = 0;
+    for (final c in clases) {
+      final k = conteoDe(nl, c);
+      p += k.presentes;
+      f += k.faltas;
+      j += k.justificadas;
+    }
+    return (presentes: p, faltas: f, justificadas: j);
+  }
+}
+
+/// Una sola tabla sin formato: N.L, nombre, estatus, por cada clase sus asistencias, faltas y
+/// justificadas, y los totales del grupo con el % de asistencia. Mismo formato que [csvRegistro]
+/// (UTF-8 con BOM, comas y CRLF).
+String csvGrupo(RegistroGrupo g) {
+  final lineas = <List<String>>[
+    [
+      'N.L',
+      'Nombre',
+      'Estatus',
+      for (final c in g.clases) ...[
+        '${c.etiqueta} - Asistencias',
+        '${c.etiqueta} - Faltas',
+        '${c.etiqueta} - Justificadas',
+      ],
+      'Total asistencias',
+      'Total faltas',
+      'Total justificadas',
+      '% asistencia',
+    ],
+  ];
+  for (final f in g.filas) {
+    final t = g.total(f.nl);
+    final pct = porcentajeAsistencia(t);
+    lineas.add([
+      _sinFormula(f.nl),
+      _sinFormula(f.nombre),
+      f.baja ? 'Baja' : 'Activo',
+      for (final c in g.clases) ...[
+        '${g.conteoDe(f.nl, c).presentes}',
+        '${g.conteoDe(f.nl, c).faltas}',
+        '${g.conteoDe(f.nl, c).justificadas}',
+      ],
+      '${t.presentes}',
+      '${t.faltas}',
+      '${t.justificadas}',
+      pct == null ? '' : (pct * 100).toStringAsFixed(1),
+    ]);
+  }
+  return '﻿${lineas.map((l) => l.map(_campoCsv).join(',')).join('\r\n')}\r\n';
+}
+
+Uint8List csvGrupoBytes(RegistroGrupo g) => Uint8List.fromList(utf8.encode(csvGrupo(g)));
+
+/// Una sola hoja: la clase por columnas (con su nombre combinado arriba) y los totales con fórmulas.
+Uint8List xlsxGrupo(RegistroGrupo g) {
+  if (g.clases.isEmpty) throw ArgumentError('No hay pases en los meses elegidos.');
+  final filas = g.filas;
+  final n = g.clases.length;
+  final colTotales = 2 + 3 * n; // Asistencias, Faltas, Justificadas, % asistencia
+  final ultimaCol = colTotales + 3;
+  const filaGrupos = 3; // nombres de las clases
+  const filaTitulos = 4; // Asist., Faltas, Just.
+  final primera = filaTitulos + 1;
+
+  final datos = <List<CeldaXlsx?>>[];
+  for (var i = 0; i < filas.length; i++) {
+    final f = filas[i];
+    final fila = primera + i;
+    final t = g.total(f.nl);
+    String suma(int desplazamiento) =>
+        [for (var k = 0; k < n; k++) celdaXlsx(fila, 2 + 3 * k + desplazamiento)].join('+');
+    final p = celdaXlsx(fila, colTotales);
+    final j = celdaXlsx(fila, colTotales + 2);
+    datos.add([
+      _celdaNl(f.nl),
+      _celdaNombre(f),
+      for (final c in g.clases) ...[
+        CeldaXlsx.numero(g.conteoDe(f.nl, c).presentes),
+        CeldaXlsx.numero(g.conteoDe(f.nl, c).faltas),
+        CeldaXlsx.numero(g.conteoDe(f.nl, c).justificadas),
+      ],
+      CeldaXlsx.formula(suma(0), t.presentes),
+      CeldaXlsx.formula(suma(1), t.faltas),
+      CeldaXlsx.formula(suma(2), t.justificadas),
+      CeldaXlsx.formula('IF(SUM($p:$j)=0,"",$p/SUM($p:$j))', porcentajeAsistencia(t) ?? '', EstiloXlsx.porcentaje),
+    ]);
+  }
+
+  final hoja = HojaXlsx(
+    nombre: nombreHoja('Grupo completo'),
+    filas: [
+      [CeldaXlsx.texto(g.titulo, EstiloXlsx.titulo)],
+      [
+        CeldaXlsx.texto(
+          '${g.meses.length == 1 ? _capital(nombreMes(g.meses.first)) : 'De ${nombreMes(g.meses.first)} a ${nombreMes(g.meses.last)}'}'
+          ' · ${_dias(g.diasConPase)} · ${g.clases.length == 1 ? '1 clase' : '${g.clases.length} clases'}',
+          EstiloXlsx.nota,
+        ),
+      ],
+      [
+        const CeldaXlsx.texto(
+          '% asistencia = asistencias entre pases registrados de todas las clases; la falta justificada cuenta como falta',
+          EstiloXlsx.nota,
+        ),
+      ],
+      [
+        null,
+        null,
+        for (final c in g.clases) ...[
+          CeldaXlsx.texto(c.etiqueta, EstiloXlsx.encabezado),
+          const CeldaXlsx.vacia(EstiloXlsx.encabezado),
+          const CeldaXlsx.vacia(EstiloXlsx.encabezado),
+        ],
+        const CeldaXlsx.texto('Todo el grupo', EstiloXlsx.total),
+        const CeldaXlsx.vacia(EstiloXlsx.total),
+        const CeldaXlsx.vacia(EstiloXlsx.total),
+        const CeldaXlsx.vacia(EstiloXlsx.total),
+      ],
+      [
+        const CeldaXlsx.texto('N.L', EstiloXlsx.encabezado),
+        const CeldaXlsx.texto('Nombre', EstiloXlsx.encabezado),
+        for (var k = 0; k < n; k++) ...[
+          const CeldaXlsx.texto('Asist.', EstiloXlsx.encabezado),
+          const CeldaXlsx.texto('Faltas', EstiloXlsx.encabezado),
+          const CeldaXlsx.texto('Just.', EstiloXlsx.encabezado),
+        ],
+        for (final t in ['Asistencias', 'Faltas', 'Justificadas', '% asistencia']) CeldaXlsx.texto(t, EstiloXlsx.total),
+      ],
+      ...datos,
+    ],
+    anchos: {
+      0: 6,
+      1: 34,
+      for (var c = 2; c < colTotales; c++) c: 8,
+      colTotales: 12,
+      colTotales + 1: 9,
+      colTotales + 2: 12,
+      colTotales + 3: 12,
+    },
+    combinadas: [
+      for (var i = 0; i < 3; i++) 'A${i + 1}:${celdaXlsx(i, ultimaCol)}',
+      for (var k = 0; k < n; k++) '${celdaXlsx(filaGrupos, 2 + 3 * k)}:${celdaXlsx(filaGrupos, 4 + 3 * k)}',
+      '${celdaXlsx(filaGrupos, colTotales)}:${celdaXlsx(filaGrupos, ultimaCol)}',
+    ],
+    fijarFilas: filaTitulos + 1,
+    fijarColumnas: 2,
+  );
+  return crearXlsx([hoja]);
+}

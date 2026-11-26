@@ -46,6 +46,11 @@ Stream<QuerySnapshot<Map<String, dynamic>>> pasesDelMes(
 Future<QuerySnapshot<Map<String, dynamic>>> pasesDeLaClase(String? uid, String claseId) =>
     _pasesDeLaClase(uid, claseId).orderBy('fecha').get();
 
+/// Todos los pases de un grupo (de todas sus clases), para exportar la asistencia del grupo. Solo el
+/// admin y orden pueden consultar sin filtrar por profe (reglas). Sin internet responde con la caché.
+Future<QuerySnapshot<Map<String, dynamic>>> pasesDelGrupo(String grupoId) =>
+    _db.collection('pases').where('grupoId', isEqualTo: grupoId).get();
+
 // Orden (y admin) leen grupos, clases y pases sin depender del documento, así que pueden consultar
 // colecciones completas.
 

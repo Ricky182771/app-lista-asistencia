@@ -137,7 +137,7 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   web el ancho se guarda en `localStorage` (`paselista.anchoNombre`); en Android dura mientras la app esté
   abierta.
 - **Herramientas avanzadas (admin):** pantalla aparte (ícono 🔧 de la barra del inicio del admin,
-  `HerramientasAvanzadas`) con tres herramientas por lote que leen un CSV, lo convierten en filas
+  `HerramientasAvanzadas`) con **Versión de la app** (ver "Actualizaciones del APK") y tres herramientas por lote que leen un CSV, lo convierten en filas
   editables y **no guardan nada hasta revisar la vista previa**. Lógica pura en `lib/models/lote_*.dart`
   (con pruebas), pantallas en `lib/screens/lote_*.dart`, piezas comunes en `lote_comun.dart`. Cada fila
   queda **lista**, **con aviso** (se guarda: posible duplicado, errata en el correo…), **con error** (hay
@@ -186,6 +186,12 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   "Vista mensual de…" y la vista mensual en solo consulta muestran "Prof. Nombre · Salón A7"
   (`profeYSalon`). En el detalle del grupo el salón es el real del pase; en la vista mensual, el de siempre
   de la clase. El .xlsx exportado lleva lo mismo en el título de cada hoja (el nombre del archivo no).
+- **Exportar asistencia del grupo** (botón en la sección "Clases" de la pantalla del grupo, solo admin): una
+  sola consulta de los pases del grupo (`pasesDelGrupo`, filtra por `grupoId`, sin índice nuevo). Una fila por
+  alumno con asistencias, faltas y justificadas **por clase** y los totales del grupo con el % de asistencia
+  (`RegistroGrupo`, `csvGrupo`, `xlsxGrupo` en `lib/models/exportar.dart`). No lleva una columna por día
+  (para eso está el registro de cada clase). Una clase borrada no entra: sus pases se conservan pero ya no
+  tienen materia.
 - **Actualizaciones del APK:** el APK se publica en GitHub Releases como `PaseLista.apk` con
   `scripts/publicar-apk.sh` (ver README, "Publicar una versión"). `config/app` dice cuál es la última:
   si el `+N` de `pubspec.yaml` de este APK es menor que `buildActual`, cada inicio muestra la tarjeta
@@ -194,7 +200,9 @@ config/app                   versionActual, buildActual, buildMinimo (opcional),
   vez del inicio. Solo en Android: la web siempre es la desplegada. Si `config/app` no existe, viene mal
   (`avisoActualizacion` exige `buildActual` numérico y `urlApk` https) o no se puede leer, no avisa ni
   bloquea. Lo lee cualquier usuario dado de alta (`registrado()` en las reglas); solo el admin lo escribe,
-  por ahora desde la consola de Firebase.
+  desde Herramientas avanzadas → **Versión de la app** (`VersionApp`; valida con `validarConfig`: versión
+  `1.2.0`, `buildActual` entero, `buildMinimo` opcional y no mayor que `buildActual`, `urlApk` https; al
+  poner un `buildMinimo` nuevo pide confirmar porque bloquea a quien tenga menos) o desde la consola.
 - **Mensaje para padres:** uno por grupo al día, a partir del **pase de la mañana** (el primero del día
   según `marcadoEn`). Lista solo nombres con falta sin justificar (`1`), sin materia. La app no se
   conecta a WhatsApp: genera el texto y lo copia al portapapeles.
