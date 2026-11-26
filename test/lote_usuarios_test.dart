@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:app_lista_asistencia/models/lote_csv.dart';
 import 'package:app_lista_asistencia/models/lote_usuarios.dart';
 import 'package:app_lista_asistencia/models/rol.dart';
 

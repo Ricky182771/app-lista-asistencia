@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/grupo.dart';
-import '../models/lote_csv.dart';
 import '../models/lote_grupos.dart';
 import '../services/grupos.dart';
 import 'inicio.dart';
