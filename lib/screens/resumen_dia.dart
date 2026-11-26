@@ -196,6 +196,9 @@ class _ResumenDiaState extends State<ResumenDia> {
         ),
         if (sinPase.isNotEmpty)
           ExpansionTile(
+            // Llave propia: sin ella comparte el lugar de PageStorage con el scroll del ListView
+            // ('resumen'), que guarda un double, y al reconstruirse lee un bool y truena.
+            key: const PageStorageKey('resumen-sin-pase'),
             leading: Icon(Icons.person_off_outlined, color: colores.error),
             title: Text(sinPase.length == 1
                 ? '1 profesor sin ningún pase'
