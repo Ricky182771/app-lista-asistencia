@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -13,6 +14,32 @@ final _db = FirebaseFirestore.instance;
 /// recurso `default_web_client_id` desde google-services.json y `google_sign_in_android` lo toma de ahí.
 Future<void> iniciarGoogleSignIn() =>
     kIsWeb ? Future.value() : GoogleSignIn.instance.initialize();
+
+/// Los dos dominios con los que Firebase Hosting sirve la versión web.
+const dominiosHosting = {'paselista-9326a.web.app', 'paselista-9326a.firebaseapp.com'};
+
+/// Web: [base] con `authDomain` = el dominio desde el que se abrió la app ([host]).
+///
+/// El inicio de sesión con Google pasa por `https://{authDomain}/__/auth/handler`. Si ese dominio no es
+/// el de la página (la app en `web.app` y el handler en `firebaseapp.com`), Safari en iPhone y otros
+/// navegadores que particionan el almacenamiento por sitio no le pasan su estado al handler y Google
+/// responde "Unable to process request due to missing initial state". Con el mismo dominio no pasa.
+/// Fuera de Hosting (localhost, emulador) se queda el de firebase_options.dart.
+/// Cada dominio necesita su `https://{dominio}/__/auth/handler` en los URI de redireccionamiento del
+/// cliente OAuth web (ver README).
+FirebaseOptions opcionesWeb(FirebaseOptions base, String host) {
+  if (!dominiosHosting.contains(host) || host == base.authDomain) return base;
+  return FirebaseOptions(
+    apiKey: base.apiKey,
+    appId: base.appId,
+    messagingSenderId: base.messagingSenderId,
+    projectId: base.projectId,
+    authDomain: host,
+    databaseURL: base.databaseURL,
+    storageBucket: base.storageBucket,
+    measurementId: base.measurementId,
+  );
+}
 
 const _claveCompartida = 'paselista.computadoraCompartida';
 

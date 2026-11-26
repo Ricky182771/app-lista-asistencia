@@ -114,6 +114,19 @@ firebase deploy --only firestore:rules,firestore:indexes
 flutter build web && firebase deploy --only hosting
 ```
 
+### Iniciar sesión en web desde iPhone (una sola vez)
+
+La web entra con Google usando el mismo dominio desde el que se abrió (`web.app` o `firebaseapp.com`,
+ver `opcionesWeb` en `lib/services/sesion.dart`). Si no, Safari en iPhone responde
+"Unable to process request due to missing initial state". Para que Google acepte `web.app`, en
+Google Cloud Console → **APIs y servicios → Credenciales → Web client (auto created by Google
+Service)** → **URI de redireccionamiento autorizados**, deben estar los dos:
+
+```
+https://paselista-9326a.firebaseapp.com/__/auth/handler
+https://paselista-9326a.web.app/__/auth/handler
+```
+
 ## Publicar una versión (solo Ricardo)
 
 La web se actualiza sola con `firebase deploy --only hosting`. El APK se reparte por GitHub Releases con
