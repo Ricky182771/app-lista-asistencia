@@ -7,6 +7,7 @@ import '../models/clase.dart';
 import '../models/grupo.dart';
 import '../services/clases.dart';
 import 'inicio.dart';
+import 'lote_comun.dart' show confirmarLote;
 import 'pase_mensual.dart';
 
 /// Las clases de un grupo, con su profe y materia, y el alta, la edición y el borrado de clases.
@@ -78,12 +79,79 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
       );
       return;
     }
+    if (editar != null && editar.profesorUid != clase.profesorUid) {
+      await _reasignar(editar, clase);
+      return;
+    }
     // Sin `await`: sin internet el Future no se completa (ver CLAUDE.md); solo avisa si falla.
     if (editar == null) {
       avisarSiFalla(context, darDeAltaClase(clase), 'No se dio de alta la clase de ${clase.materia}');
     } else {
       avisarSiFalla(context, editarClase(clase), 'No se guardaron los cambios de la clase de ${clase.materia}');
     }
+  }
+
+  /// Pasa la clase a otro profe. Es lo único de las clases que **espera con `await` y pide internet**
+  /// (lee del servidor los pases de la clase y los pasa al profe nuevo); por eso se avisa con un
+  /// diálogo de progreso en vez de dejar la escritura pendiente.
+  Future<void> _reasignar(Clase anterior, Clase nueva) async {
+    final nombres = _nombres;
+    final deQuien = nombres[anterior.profesorUid] ?? anterior.profesorNombre;
+    final ok = await confirmarLote(
+      context,
+      titulo: 'Pasar la clase a otro profesor',
+      mensaje: '${nueva.materia} de ${widget.nombreGrupo} deja de ser de '
+          '${deQuien.isEmpty ? 'su profesor actual' : deQuien} y pasa a '
+          '${nueva.profesorNombre.isEmpty ? 'el profesor elegido' : nueva.profesorNombre}. '
+          'Los pases ya hechos pasan con la clase: el profesor nuevo ve todo el historial y puede '
+          'corregirlo. Se necesita internet.',
+      boton: 'Pasar clase',
+    );
+    if (!ok || !mounted) return;
+    final progreso = ValueNotifier<String>('Preparando…');
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ValueListenableBuilder<String>(
+                  valueListenable: progreso,
+                  builder: (_, texto, _) => Text(texto),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ));
+    String? error;
+    try {
+      await reasignarClase(
+        clase: nueva,
+        profesorUid: nueva.profesorUid,
+        profesorNombre: nueva.profesorNombre,
+        progreso: (hechos, total) => progreso.value = 'Moviendo la clase y sus pases ($hechos de $total)…',
+      );
+    } on FirebaseException catch (e) {
+      error = e.code == 'unavailable'
+          ? 'No hay conexión con el servidor. Conéctate a internet y vuelve a intentarlo.'
+          : '${e.message ?? e.code}';
+    } catch (e) {
+      error = '$e';
+    }
+    if (!mounted) return;
+    Navigator.pop(context); // cierra el progreso
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(error == null
+          ? 'La clase de ${nueva.materia} pasó a ${nueva.profesorNombre.isEmpty ? 'el profesor elegido' : nueva.profesorNombre}.'
+          : 'No se terminó de pasar la clase: $error Puedes volver a intentarlo: continúa donde se quedó.'),
+    ));
   }
 
   Future<void> _confirmarBorrar(Clase clase, String profesor) async {
@@ -180,8 +248,8 @@ class _ClasesDelGrupoState extends State<ClasesDelGrupo> {
   }
 }
 
-/// Pide profesor, materia y salón; devuelve la [Clase] o `null` si se cancela. Con [editar] el
-/// profesor queda fijo y la clase conserva su ID.
+/// Pide profesor, materia y salón; devuelve la [Clase] o `null` si se cancela. Con [editar] la clase
+/// conserva su ID; si cambia el profesor, quien llama la reasigna (`reasignarClase`).
 class _DialogoClase extends StatefulWidget {
   const _DialogoClase({
     required this.grupoId,
@@ -229,7 +297,8 @@ class _DialogoClaseState extends State<_DialogoClase> {
       grupoId: widget.grupoId,
       materia: limpiarNombre(_materia.text),
       salon: limpiarNombre(_salon.text),
-      profesorNombre: '${profe?['nombre'] ?? widget.editar?.profesorNombre ?? ''}'.trim(),
+      // Un profe nuevo nunca hereda el nombre del anterior; solo si no cambia y perdió el acceso.
+      profesorNombre: '${profe?['nombre'] ?? (_profesorUid == widget.editar?.profesorUid ? widget.editar?.profesorNombre : null) ?? ''}'.trim(),
     );
     if (materiaRepetida(widget.clases, clase)) {
       setState(() => _errorMateria = 'Este profesor ya da esa materia a este grupo.');
@@ -254,34 +323,41 @@ class _DialogoClaseState extends State<_DialogoClase> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Al editar, el profe no cambia (otro profe sería otra clase) y puede que ya no
-                    // esté en la lista si perdió el acceso.
-                    if (widget.editar != null)
-                      InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Profesor'),
-                        child: Text(
-                          editado == null
-                              ? 'Profesor que ya no tiene acceso'
-                              : '${editado['nombre'] ?? editado['email']}',
-                        ),
-                      )
-                    else
-                      DropdownButtonFormField<String>(
-                        initialValue: _profesorUid,
-                        isExpanded: true,
-                        decoration: InputDecoration(labelText: 'Profesor', errorText: _errorProfesor),
-                        items: [
-                          for (final d in profesores)
-                            DropdownMenuItem(
-                              value: d.id,
-                              child: Text(
-                                '${d.data()['nombre'] ?? d.data()['email'] ?? d.id}',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                        onChanged: (uid) => setState(() => _profesorUid = uid),
+                    // Al editar se puede pasar la clase a otro profe (reasignar); el profe actual
+                    // sigue en la lista aunque ya no tenga acceso, para poder dejarlo.
+                    DropdownButtonFormField<String>(
+                      initialValue: _profesorUid,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Profesor',
+                        errorText: _errorProfesor,
+                        helperText: widget.editar != null && _profesorUid != widget.editar!.profesorUid
+                            ? 'La clase y sus pases pasarán a este profesor. Se necesita internet.'
+                            : null,
+                        helperMaxLines: 3,
                       ),
+                      items: [
+                        if (widget.editar != null && editado == null)
+                          DropdownMenuItem(
+                            value: widget.editar!.profesorUid,
+                            child: Text(
+                              widget.editar!.profesorNombre.isEmpty
+                                  ? 'Profesor que ya no tiene acceso'
+                                  : '${widget.editar!.profesorNombre} (ya no tiene acceso)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        for (final d in profesores)
+                          DropdownMenuItem(
+                            value: d.id,
+                            child: Text(
+                              '${d.data()['nombre'] ?? d.data()['email'] ?? d.id}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (uid) => setState(() => _profesorUid = uid),
+                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _materia,

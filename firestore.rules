@@ -81,6 +81,15 @@ service cloud.firestore {
         && editable(resource.data.fecha)
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['estados', 'enviadoEn', 'editadoEn']);
+      // Reasignar una clase a otro profe (Herramientas del admin): el admin solo puede cambiar el
+      // `profesorUid` de un pase, y solo al profe que la clase tiene *al terminar* el WriteBatch
+      // (`getAfter`). Así el admin no puede dar un pase a quien no es dueño de la clase, y los
+      // rezagados se pueden mover después de reasignar (la clase ya trae al profe nuevo). Todos los
+      // pases de un batch son de la misma clase, así que `get`/`getAfter` cuentan una sola vez.
+      allow update: if isRole('admin')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['profesorUid'])
+        && request.resource.data.profesorUid
+             == getAfter(/databases/$(db)/documents/clases/$(resource.data.claseId)).data.profesorUid;
       allow delete: if isRole('admin');
     }
   }

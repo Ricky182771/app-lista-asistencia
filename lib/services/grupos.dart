@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/grupo.dart';
+import '../models/lote_grupos.dart' show GrupoPorGuardar;
 
 final _db = FirebaseFirestore.instance;
 
@@ -17,6 +18,30 @@ Future<void> crearGrupo(String id, String nombre, List<Alumno> alumnos) =>
       'alumnos': [for (final a in alumnos) a.toMap()],
       'profesores': <String>[],
     });
+
+/// Crea o actualiza varios grupos a la vez (Herramientas avanzadas), en lotes de 400 (límite de un
+/// `WriteBatch`: 500). Con `nombre` crea el grupo (sin profesores; se agregan al dar de alta una
+/// clase); sin `nombre` solo reemplaza `alumnos` de un grupo que ya existe. Quien llama revisa antes
+/// que los IDs nuevos no existan (`validarGrupos`): `set()` reemplazaría el grupo completo.
+/// Devuelve un Future por lote; sin `await` a propósito (ver [crearGrupo]).
+List<Future<void>> guardarGrupos(List<GrupoPorGuardar> grupos) {
+  final lotes = <Future<void>>[];
+  for (final lote in enLotes(grupos, 400)) {
+    final batch = _db.batch();
+    for (final g in lote) {
+      final ref = _db.doc('grupos/${g.id}');
+      final alumnos = [for (final a in g.alumnos) a.toMap()];
+      final nombre = g.nombre;
+      if (nombre == null) {
+        batch.update(ref, {'alumnos': alumnos});
+      } else {
+        batch.set(ref, {'nombre': nombre, 'alumnos': alumnos, 'profesores': <String>[]});
+      }
+    }
+    lotes.add(batch.commit());
+  }
+  return lotes;
+}
 
 /// Un grupo, para editarlo. Lo pendiente se ve con `metadata.hasPendingWrites`.
 Stream<DocumentSnapshot<Map<String, dynamic>>> grupo(String id) =>

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../models/grupo.dart' show enLotes;
 import '../models/rol.dart';
 import 'almacen_local.dart' if (dart.library.js_interop) 'almacen_local_web.dart';
 
@@ -149,6 +150,25 @@ Future<void> invitar(String correo, Rol rol) =>
       'rol': rol.name,
       'creadoPor': FirebaseAuth.instance.currentUser!.uid,
     });
+
+/// Invita a varias personas a la vez (Herramientas avanzadas), en lotes de 400 (límite de un
+/// `WriteBatch`: 500). Una invitación que ya existía se reescribe con el rol nuevo. Devuelve un
+/// Future por lote; sin `await` a propósito (ver [invitar]).
+List<Future<void>> invitarVarios(List<({String correo, Rol rol})> personas) {
+  final yo = FirebaseAuth.instance.currentUser!.uid;
+  final lotes = <Future<void>>[];
+  for (final lote in enLotes(personas, 400)) {
+    final batch = _db.batch();
+    for (final p in lote) {
+      batch.set(_db.doc('invitaciones/${normalizarCorreo(p.correo)}'), {
+        'rol': p.rol.name,
+        'creadoPor': yo,
+      });
+    }
+    lotes.add(batch.commit());
+  }
+  return lotes;
+}
 
 Stream<QuerySnapshot<Map<String, dynamic>>> invitaciones() =>
     _db.collection('invitaciones').snapshots(includeMetadataChanges: true); // ordenadas por correo (id)

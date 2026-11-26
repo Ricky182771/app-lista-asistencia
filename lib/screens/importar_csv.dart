@@ -198,7 +198,7 @@ class _ImportarCsvState extends State<ImportarCsv> {
             onDragEntered: (_) => setState(() => _arrastrando = true),
             onDragExited: (_) => setState(() => _arrastrando = false),
             onDragDone: _soltar,
-            child: _ZonaArchivo(resaltada: _arrastrando, archivo: _archivo, alTocar: _elegir),
+            child: ZonaArchivo(resaltada: _arrastrando, archivo: _archivo, alTocar: _elegir),
           ),
           if (_errorArchivo != null) ...[
             const SizedBox(height: 8),
@@ -263,8 +263,8 @@ class _ImportarCsvState extends State<ImportarCsv> {
 }
 
 /// Zona para soltar el archivo (web) o tocarla y elegirlo (web y Android).
-class _ZonaArchivo extends StatelessWidget {
-  const _ZonaArchivo({required this.resaltada, required this.archivo, required this.alTocar});
+class ZonaArchivo extends StatelessWidget {
+  const ZonaArchivo({required this.resaltada, required this.archivo, required this.alTocar});
   final bool resaltada;
   final String? archivo;
   final VoidCallback alTocar;
