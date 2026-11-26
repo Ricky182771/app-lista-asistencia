@@ -127,8 +127,8 @@ void main() {
   });
 
   group('xlsxGrupo', () {
-    final zip = leerZip(xlsxGrupo(_grupo({'2026-10', '2026-11'})));
-    final hoja = zip['xl/worksheets/sheet1.xml']!;
+    late final zip = leerZip(xlsxGrupo(_grupo({'2026-10', '2026-11'})));
+    late final hoja = zip['xl/worksheets/sheet1.xml']!;
 
     test('una sola hoja con el título y el nombre de cada clase combinado arriba', () {
       expect(zip['xl/workbook.xml'], contains('<sheet name="Grupo completo" sheetId="1"'));
