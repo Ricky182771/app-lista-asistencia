@@ -316,3 +316,32 @@ describe('pases', () => {
     await assertFails(updateDoc(ref, { 'estados.1': 1, editadoEn: serverTimestamp() }));
   });
 });
+
+describe('config', () => {
+  const config = { versionActual: '1.1.0', buildActual: 2, urlApk: 'https://ejemplo.com/PaseLista.apk' };
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'config/app'), config)));
+
+  test('cualquier usuario dado de alta la lee', async () => {
+    for (const uid of ['admin', 'profe', 'orden']) {
+      await assertSucceeds(getDoc(doc(como(uid), 'config/app')));
+    }
+  });
+
+  test('la lectura de un documento que aún no existe también pasa (la app escucha config/app desde el día uno)', async () => {
+    await assertSucceeds(getDoc(doc(como('profe'), 'config/otro')));
+  });
+
+  test('sin sesión o sin estar dado de alta no se lee', async () => {
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'config/app')));
+    await assertFails(getDoc(doc(como('desconocido'), 'config/app')));
+  });
+
+  test('solo el admin la escribe', async () => {
+    await assertSucceeds(setDoc(doc(como('admin'), 'config/app'), { ...config, buildActual: 3 }));
+    await assertFails(setDoc(doc(como('profe'), 'config/app'), { ...config, buildMinimo: 99 }));
+    await assertFails(updateDoc(doc(como('orden'), 'config/app'), { urlApk: 'https://otro.com/x.apk' }));
+    await assertFails(deleteDoc(doc(como('profe'), 'config/app')));
+  });
+});

@@ -12,6 +12,7 @@ class Clase {
     required this.grupoId,
     required this.materia,
     required this.salon,
+    this.profesorNombre = '',
   });
 
   /// `''` en una clase que aún no se da de alta.
@@ -21,8 +22,18 @@ class Clase {
   final String materia;
   final String salon;
 
-  Map<String, dynamic> toMap() =>
-      {'profesorUid': profesorUid, 'grupoId': grupoId, 'materia': materia, 'salon': salon};
+  /// Copia de `usuarios/{profesorUid}.nombre`: el encargado de orden no puede leer `usuarios` (las
+  /// reglas solo dejan al admin), así que el nombre viaja en la clase. Lo pone el admin al dar de
+  /// alta y lo mantiene al día `nombresDesactualizados`. `''` en clases viejas que aún no se ponen al día.
+  final String profesorNombre;
+
+  Map<String, dynamic> toMap() => {
+        'profesorUid': profesorUid,
+        'grupoId': grupoId,
+        'materia': materia,
+        'salon': salon,
+        'profesorNombre': profesorNombre,
+      };
 }
 
 /// Convierte el documento `clases/{id}`; `null` si le falta el profesor o el grupo.
@@ -38,6 +49,7 @@ Clase? claseDe(String id, Map<String, dynamic>? datos) {
     grupoId: grupoId,
     materia: '${datos?['materia'] ?? ''}',
     salon: '${datos?['salon'] ?? ''}',
+    profesorNombre: '${datos?['profesorNombre'] ?? ''}',
   );
 }
 
@@ -74,3 +86,22 @@ List<Clase> ordenarClases(Iterable<Clase> clases, Map<String, String> nombres) {
       '${c.materia.toLowerCase()}\n${c.profesorUid}';
   return clases.toList()..sort((a, b) => llave(a).compareTo(llave(b)));
 }
+
+/// Las clases cuyo `profesorNombre` no coincide con el nombre actual del profe: claseId → nombre
+/// nuevo. [nombres] es uid → `usuarios.nombre`; un profe que no está en [nombres] (perdió el acceso)
+/// o sin nombre no se toca, así su clase conserva el último nombre conocido.
+Map<String, String> nombresDesactualizados(Iterable<Clase> clases, Map<String, String> nombres) {
+  final cambios = <String, String>{};
+  for (final c in clases) {
+    final nombre = nombres[c.profesorUid]?.trim() ?? '';
+    if (c.id.isNotEmpty && nombre.isNotEmpty && nombre != c.profesorNombre) cambios[c.id] = nombre;
+  }
+  return cambios;
+}
+
+/// "Prof. Nombre · Salón A7" (sin el profe si no hay nombre; sin el salón si está vacío), para
+/// identificar la clase en la vista del encargado de orden y en la vista mensual.
+String profeYSalon(String profesorNombre, String salon) => [
+      if (profesorNombre.trim().isNotEmpty) 'Prof. ${profesorNombre.trim()}',
+      if (salon.trim().isNotEmpty) 'Salón ${salon.trim()}',
+    ].join(' · ');

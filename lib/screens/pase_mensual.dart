@@ -28,12 +28,17 @@ void _guardarAnchoNombre(double? ancho) {
 }
 const _anchoDia = 96.0;
 
+/// En el teléfono la cabecera es "lun 23" (el mes ya está arriba) y la columna cabe en menos espacio,
+/// así se ven más días y más del nombre.
+const _anchoDiaCompacto = 60.0;
+
 /// Admin y orden: la vista mensual en solo consulta (con exportar). [mes] por omisión, el actual.
 void abrirConsultaMensual(
   BuildContext context, {
   required String claseId,
   required DocumentSnapshot<Map<String, dynamic>> grupo,
   required String titulo,
+  String subtitulo = '',
   DateTime? mes,
 }) {
   Navigator.push(
@@ -43,6 +48,7 @@ void abrirConsultaMensual(
         claseId: claseId,
         grupo: grupo,
         titulo: titulo,
+        subtitulo: subtitulo,
         mes: mes ?? DateTime.now(),
         soloLectura: true,
       ),
@@ -59,11 +65,18 @@ class PaseMensual extends StatefulWidget {
     required this.grupo,
     required this.titulo,
     required this.mes,
+    this.subtitulo = '',
     this.soloLectura = false,
   });
   final String claseId;
   final DocumentSnapshot<Map<String, dynamic>> grupo;
+
+  /// "Grupo · Materia". También va en el nombre del archivo exportado.
   final String titulo;
+
+  /// "Prof. Nombre · Salón A7" (ver `profeYSalon`); va bajo el título y en el encabezado del .xlsx.
+  /// Vacío en la vista del propio profe.
+  final String subtitulo;
   final DateTime mes;
 
   /// Para admin y orden: no se edita nada y las consultas no filtran por profesor (las reglas les
@@ -147,6 +160,7 @@ class _PaseMensualState extends State<PaseMensual> {
 
       final registro = Registro(
         titulo: widget.titulo,
+        subtitulo: widget.subtitulo,
         pases: pases,
         alumnos: (widget.grupo.data()?['alumnos'] as List?) ?? const [],
         meses: eleccion.meses,
@@ -176,9 +190,26 @@ class _PaseMensualState extends State<PaseMensual> {
     final hoy = DateTime.now();
     final esMesActual = _mes.year == hoy.year && _mes.month == hoy.month;
     final snap = _snap;
+    final compacto = esCompacto(context);
+    final denso = compacto ? VisualDensity.compact : null;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.titulo),
+        title: widget.subtitulo.isEmpty
+            ? Text(widget.titulo)
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.titulo, overflow: TextOverflow.ellipsis),
+                  Text(
+                    widget.subtitulo,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
         actions: [
           IconButton(
             tooltip: 'Exportar registro (Excel o CSV)',
@@ -195,6 +226,7 @@ class _PaseMensualState extends State<PaseMensual> {
             children: [
               IconButton(
                 tooltip: 'Mes anterior',
+                visualDensity: denso,
                 onPressed: () => _mover(-1),
                 icon: const Icon(Icons.chevron_left),
               ),
@@ -207,6 +239,7 @@ class _PaseMensualState extends State<PaseMensual> {
               ),
               IconButton(
                 tooltip: 'Mes siguiente',
+                visualDensity: denso,
                 // No hay pases en el futuro.
                 onPressed: esMesActual ? null : () => _mover(1),
                 icon: const Icon(Icons.chevron_right),
@@ -217,35 +250,38 @@ class _PaseMensualState extends State<PaseMensual> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Wrap(
               spacing: 16,
-              runSpacing: 8,
+              runSpacing: compacto ? 4 : 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const LeyendaEstados(),
+                LeyendaEstados(compacta: compacto),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(widget.soloLectura ? Icons.visibility_outlined : Icons.lock_outline, size: 18),
-                    const SizedBox(width: 6),
-                    Text(widget.soloLectura ? 'Solo consulta' : 'Más de $diasEditables días: solo lectura'),
+                    Icon(widget.soloLectura ? Icons.visibility_outlined : Icons.lock_outline, size: compacto ? 14 : 18),
+                    SizedBox(width: compacto ? 4 : 6),
+                    Text(
+                      widget.soloLectura ? 'Solo consulta' : 'Más de $diasEditables días: solo lectura',
+                      style: compacto ? Theme.of(context).textTheme.bodySmall : null,
+                    ),
                   ],
                 ),
               ],
             ),
           ),
-          const Divider(),
+          Divider(height: compacto ? 12 : 16),
           Expanded(
             child: _error != null
                 ? Center(child: Text('Error al cargar el mes: $_error'))
                 : snap == null
                     ? const Center(child: CircularProgressIndicator())
-                    : _tabla(snap, hoy),
+                    : _tabla(snap, hoy, compacto),
           ),
         ],
       ),
     );
   }
 
-  Widget _tabla(QuerySnapshot<Map<String, dynamic>> snap, DateTime hoy) {
+  Widget _tabla(QuerySnapshot<Map<String, dynamic>> snap, DateTime hoy, bool compacto) {
     final pases = {for (final d in snap.docs) '${d.data()['fecha']}': d};
     final columnas = columnasDelMes(pases.keys);
     if (columnas.isEmpty) return const Center(child: Text('No hay pases en este mes.'));
@@ -259,6 +295,7 @@ class _PaseMensualState extends State<PaseMensual> {
     final pantalla = MediaQuery.sizeOf(context).width;
     final anchoFijo = anchoNombre(_anchoNombreElegido, pantalla);
     final cabecera = Theme.of(context).textTheme.labelMedium;
+    final anchoDia = compacto ? _anchoDiaCompacto : _anchoDia;
 
     Widget celdaFija(Widget child) => SizedBox(height: _alto, child: Align(alignment: Alignment.centerLeft, child: child));
 
@@ -273,14 +310,25 @@ class _PaseMensualState extends State<PaseMensual> {
                 children: [
                   celdaFija(Text('  N.L   Nombre', style: cabecera)),
                   for (final f in filas)
+                    // En el teléfono el nombre va en letra chica y en hasta dos líneas: cabe completo
+                    // casi siempre sin quitarle espacio a las fechas.
                     celdaFija(Row(
                       children: [
-                        SizedBox(width: 32, child: Text(f.nl, textAlign: TextAlign.end)),
-                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: compacto ? 24 : 32,
+                          child: Text(
+                            f.nl,
+                            textAlign: TextAlign.end,
+                            style: compacto ? Theme.of(context).textTheme.bodySmall : null,
+                          ),
+                        ),
+                        SizedBox(width: compacto ? 8 : 12),
                         Expanded(
                           child: Text(
                             f.baja ? '${f.nombre} (baja)' : f.nombre,
+                            maxLines: compacto ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
+                            style: compacto ? Theme.of(context).textTheme.bodySmall : null,
                           ),
                         ),
                       ],
@@ -294,11 +342,12 @@ class _PaseMensualState extends State<PaseMensual> {
                 scrollDirection: Axis.horizontal,
                 child: Column(
                   children: [
-                    Row(children: [for (final c in columnas) _cabecera(c, pases[c]!, hoy, cabecera)]),
+                    Row(children: [for (final c in columnas) _cabecera(c, pases[c]!, hoy, cabecera, anchoDia, compacto)]),
                     for (final f in filas)
                       Row(
                         children: [
-                          for (final c in columnas) _celda(c, pases[c]!.id, f.nl, estadosDe[c]![f.nl], hoy),
+                          for (final c in columnas)
+                            _celda(c, pases[c]!.id, f.nl, estadosDe[c]![f.nl], hoy, anchoDia),
                         ],
                       ),
                   ],
@@ -363,11 +412,20 @@ class _PaseMensualState extends State<PaseMensual> {
     setState(() => _sobreBorde = false);
   }
 
-  Widget _cabecera(String fecha, DocumentSnapshot<Object?> pase, DateTime hoy, TextStyle? estilo) {
+  /// [compacto]: "lun 23" en vez de "2026-11-23"; la fecha completa queda en el tooltip.
+  Widget _cabecera(
+    String fecha,
+    DocumentSnapshot<Object?> pase,
+    DateTime hoy,
+    TextStyle? estilo,
+    double ancho,
+    bool compacto,
+  ) {
     // En solo consulta no se marca ningún candado: no se edita ninguna columna.
     final editable = widget.soloLectura || esEditable(fecha, hoy);
+    final texto = Text(compacto ? encabezadoDia(fecha) : fecha, style: estilo);
     return SizedBox(
-      width: _anchoDia,
+      width: ancho,
       height: _alto,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -380,18 +438,18 @@ class _PaseMensualState extends State<PaseMensual> {
                 const Tooltip(message: 'Pendiente de enviar', child: Icon(Icons.cloud_upload_outlined, size: 14)),
             ],
           ),
-          Text(fecha, style: estilo),
+          if (compacto) Tooltip(message: fecha, child: texto) else texto,
         ],
       ),
     );
   }
 
-  Widget _celda(String fecha, String paseId, String nl, Object? valor, DateTime hoy) {
+  Widget _celda(String fecha, String paseId, String nl, Object? valor, DateTime hoy, double ancho) {
     final editable = esEditable(fecha, hoy);
     final actual = (valor as num?)?.toInt();
     final celda = CeldaEstado(estado: actual);
     return SizedBox(
-      width: _anchoDia,
+      width: ancho,
       height: _alto,
       child: Center(
         child: widget.soloLectura

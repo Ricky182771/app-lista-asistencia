@@ -27,6 +27,7 @@ npm --prefix test/rules install    # una vez: dependencias de las pruebas de reg
 firebase emulators:exec --only firestore "npm --prefix test/rules test"   # pruebas de firestore.rules
 firebase deploy --only firestore:rules,firestore:indexes
 flutter build apk --release
+scripts/publicar-apk.sh "Notas"    # desde main: sube el APK a GitHub Releases (ver README)
 flutter build web && firebase deploy --only hosting
 ```
 
@@ -50,10 +51,11 @@ admin se crea a mano en la consola de Firebase.
 usuarios/{uid}               nombre, email, fotoUrl, rol
 invitaciones/{email}         rol, creadoPor                  // ID = correo en minúsculas
 grupos/{grupoId}             nombre, profesores: [uid], alumnos: [{num, nombre, activo}]
-clases/{id generado}         profesorUid, grupoId, materia, salon (el de siempre)
+clases/{id generado}         profesorUid, profesorNombre, grupoId, materia, salon (el de siempre)
 pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el real de ese día),
                              fecha "AAAA-MM-DD", marcadoEn, enviadoEn, editadoEn,
                              estados: { "<N.L>": 0 | 1 | 2 }
+config/app                   versionActual, buildActual, buildMinimo (opcional), urlApk
 ```
 
 - **Estados de asistencia:** `0` presente, `1` falta, `2` falta justificada (sin motivo, solo la marca).
@@ -62,6 +64,11 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   mayúsculas ni acentos). El ID lo genera Firestore en el cliente (`collection('clases').doc()`) al dar de
   alta, así la materia y el salón se corrigen con un `update()` sin cambiar el ID del que dependen los
   pases. Hay clases viejas con ID `{profesorUid}_{grupoId}`: siguen sirviendo porque todo usa `doc.id`.
+- `clases.profesorNombre` es una copia de `usuarios/{profesorUid}.nombre`, porque el encargado de orden
+  no puede leer `usuarios` (las reglas solo dejan al admin y a cada quien su documento). La pone el admin al
+  dar de alta la clase, y `AdminHome` la llena en clases viejas y la corrige si el profe cambió de nombre
+  (`nombresDesactualizados`), así que se pone al día la próxima vez que un admin abre la app. Si el profe
+  pierde el acceso, su clase conserva el último nombre.
 - **Un pase por clase por día.** Una materia que dura dos módulos seguidos es un solo pase.
 - `grupos.profesores` lo mantiene el admin en el mismo `WriteBatch` con el que crea o borra una clase;
   las reglas lo usan para que un profe solo lea sus grupos. Al borrar una clase, el profe solo sale de
@@ -105,12 +112,31 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   **Riesgo que queda:** si un profe desmarca la casilla en una computadora compartida, la siguiente carga
   de la página usa caché en disco, y los datos del siguiente profe pueden quedar en IndexedDB hasta la
   carga siguiente, cuando `configurarWeb()` los borra (porque ese profe entró con la casilla marcada).
+- **Teléfono (menos de 600 px de ancho, `esCompacto`):** la vista por día y la mensual usan su versión
+  compacta. En la del día, el encabezado (fecha, estado, salón y leyenda) va dentro de la lista y se va
+  con el scroll; el botón Enviar/Guardar queda fijo. Leyenda con cuadros chicos y "Justificada" en vez de
+  "Falta justificada". En la mensual, columnas de 60 px con cabecera "lun 23" (`encabezadoDia`, la fecha
+  completa en el tooltip) y nombres en letra chica en hasta dos líneas. Las filas conservan 48 px de alto.
 - **Vista mensual del profe:** una columna por cada día que tiene pase (no se guarda horario), cabecera
-  con la fecha `AAAA-MM-DD`. Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
+  con la fecha `AAAA-MM-DD` (en el teléfono, "lun 23"). Palomita verde = 0, equis roja = 1, punto negro sobre amarillo pastel = 2.
   Las columnas de hace más de 28 días son de solo lectura. La columna Nombre se ensancha arrastrando su
   borde (doble clic la regresa al ancho automático; `anchoNombre()` la limita al 75 % de la pantalla). En
   web el ancho se guarda en `localStorage` (`paselista.anchoNombre`); en Android dura mientras la app esté
   abierta.
+- **Resumen del día (admin):** primera pestaña del inicio del admin (`ResumenDia`, lógica en
+  `lib/models/resumen_dia.dart`). Une todas las clases con los pases de un día (hoy por omisión, con
+  selector de fecha): "X de Y clases con pase", faltas del día, profes con clases y ningún pase, y la
+  lista de clases con filtro (Todas / Sin pase / Con pase) y por grupo. Tocar una clase abre su vista
+  mensual en solo consulta. **No hay horario**: una clase sin pase puede no haber tenido clase ese día,
+  así que solo se resalta (`resaltar`) si alguien más pasó lista ese día; en un día sin ningún pase
+  (fin de semana, festivo) no se resalta nada. Solo lee (`todasLasClases` y `pasesDeLaFecha`).
+- **Inicio del admin:** tres pestañas (Resumen, Grupos y Usuarios). **Grupos**: importar CSV; cada grupo con sus alumnos y número de
+  clases, y al tocarlo su pantalla con las clases. **Usuarios**: "Invitar usuario", filtro por rol
+  (Todos, Profesores, Encargados de orden, Administrativos, con cuántos hay de cada uno), "Esperando su
+  primer inicio de sesión" (invitaciones sin usar, con la ✕ para cancelarlas) y "Con acceso" (quitar
+  acceso). Una invitación sale de "Esperando…" en cuanto esa persona entra (`invitacionesSinUsar`, que
+  compara correos normalizados); la pestaña cuenta las que esperan. La cuenta y cerrar sesión van en el
+  menú del avatar de la barra (`_MenuCuenta`); los otros roles siguen usando `Inicio`.
 - **Vista mensual para admin y orden:** `PaseMensual(soloLectura: true)` vía `abrirConsultaMensual`. Admin
   la abre desde cada clase en la pantalla del grupo; orden, desde el detalle del grupo (ícono de calendario,
   elige la clase si hay varias). No se edita nada y las consultas van **sin** `profesorUid`
@@ -123,6 +149,19 @@ pases/{claseId}_{fecha}      claseId, grupoId, profesorUid, materia, salon (el r
   asistencia y faltas por día; con varios meses, una hoja "Resumen" al principio. **.csv**: una sola
   tabla plana, UTF-8 con BOM, comas y CRLF. % asistencia = P / (P + F + J). El .xlsx lo arma
   `lib/models/xlsx.dart` sin paquetes (ZIP sin compresión); no agregues uno para esto.
+- **Profe y salón en la vista de orden:** el pase de la mañana, las otras clases del día, el selector
+  "Vista mensual de…" y la vista mensual en solo consulta muestran "Prof. Nombre · Salón A7"
+  (`profeYSalon`). En el detalle del grupo el salón es el real del pase; en la vista mensual, el de siempre
+  de la clase. El .xlsx exportado lleva lo mismo en el título de cada hoja (el nombre del archivo no).
+- **Actualizaciones del APK:** el APK se publica en GitHub Releases como `PaseLista.apk` con
+  `scripts/publicar-apk.sh` (ver README, "Publicar una versión"). `config/app` dice cuál es la última:
+  si el `+N` de `pubspec.yaml` de este APK es menor que `buildActual`, cada inicio muestra la tarjeta
+  "Ya está disponible…" (`AvisoActualizacionTarjeta`); si es menor que `buildMinimo`,
+  `PuertaActualizacion` (alrededor del inicio de cada rol en `main.dart`) muestra "Actualiza la app" en
+  vez del inicio. Solo en Android: la web siempre es la desplegada. Si `config/app` no existe, viene mal
+  (`avisoActualizacion` exige `buildActual` numérico y `urlApk` https) o no se puede leer, no avisa ni
+  bloquea. Lo lee cualquier usuario dado de alta (`registrado()` en las reglas); solo el admin lo escribe,
+  por ahora desde la consola de Firebase.
 - **Mensaje para padres:** uno por grupo al día, a partir del **pase de la mañana** (el primero del día
   según `marcadoEn`). Lista solo nombres con falta sin justificar (`1`), sin materia. La app no se
   conecta a WhatsApp: genera el texto y lo copia al portapapeles.

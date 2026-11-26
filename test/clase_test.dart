@@ -5,12 +5,13 @@ import 'package:app_lista_asistencia/models/clase.dart';
 void main() {
   const clase = Clase(id: 'c1', profesorUid: 'uidAna', grupoId: 'ia-3a', materia: 'Matemáticas', salon: 'A1');
 
-  test('toMap guarda los cuatro campos de clases/{id} y nada más', () {
+  test('toMap guarda los cinco campos de clases/{id} y nada más', () {
     expect(clase.toMap(), {
       'profesorUid': 'uidAna',
       'grupoId': 'ia-3a',
       'materia': 'Matemáticas',
       'salon': 'A1',
+      'profesorNombre': '',
     });
   });
 
@@ -22,10 +23,15 @@ void main() {
       expect(c.materia, 'Matemáticas');
       expect(c.salon, 'A1');
     });
-    test('sin materia o salón quedan vacíos', () {
+    test('lee el nombre del profe', () {
+      final c = claseDe('c1', {...clase.toMap(), 'profesorNombre': 'Ana López'})!;
+      expect(c.profesorNombre, 'Ana López');
+    });
+    test('sin materia, salón o nombre del profe (clases viejas) quedan vacíos', () {
       final c = claseDe('c1', {'profesorUid': 'uidAna', 'grupoId': 'ia-3a'})!;
       expect(c.materia, '');
       expect(c.salon, '');
+      expect(c.profesorNombre, '');
     });
     test('sin profesor o sin grupo no es una clase', () {
       expect(claseDe('c1', null), isNull);
@@ -91,5 +97,39 @@ void main() {
     test('si la clase ya no está en la lista, cuenta lo que queda', () {
       expect(quitarProfeDelGrupo(const [], mate), isTrue);
     });
+  });
+
+  group('nombresDesactualizados', () {
+    Clase con(String id, String uid, String nombre) =>
+        Clase(id: id, profesorUid: uid, grupoId: 'ia-3a', materia: 'M', salon: 'A1', profesorNombre: nombre);
+    const nombres = {'uidAna': 'Ana López', 'uidLuis': 'Luis Pérez'};
+
+    test('llena las clases viejas sin nombre', () {
+      expect(nombresDesactualizados([con('c1', 'uidAna', '')], nombres), {'c1': 'Ana López'});
+    });
+    test('corrige un nombre que cambió', () {
+      expect(nombresDesactualizados([con('c1', 'uidAna', 'Ana')], nombres), {'c1': 'Ana López'});
+    });
+    test('no toca las que ya están al día', () {
+      expect(nombresDesactualizados([con('c1', 'uidAna', 'Ana López'), con('c2', 'uidLuis', 'Luis Pérez')], nombres),
+          isEmpty);
+    });
+    test('compara sin espacios de sobra', () {
+      expect(nombresDesactualizados([con('c1', 'uidAna', 'Ana López')], {'uidAna': '  Ana López '}), isEmpty);
+    });
+    test('deja igual la clase de un profe que ya no está o no tiene nombre', () {
+      expect(nombresDesactualizados([con('c1', 'uidBeto', 'Beto')], nombres), isEmpty);
+      expect(nombresDesactualizados([con('c1', 'uidAna', 'Ana')], {'uidAna': ' '}), isEmpty);
+    });
+    test('ignora una clase sin ID (aún no se da de alta)', () {
+      expect(nombresDesactualizados([con('', 'uidAna', '')], nombres), isEmpty);
+    });
+  });
+
+  group('profeYSalon', () {
+    test('con los dos', () => expect(profeYSalon('Ana López', 'A7'), 'Prof. Ana López · Salón A7'));
+    test('sin nombre del profe', () => expect(profeYSalon('', 'A7'), 'Salón A7'));
+    test('sin salón', () => expect(profeYSalon(' Ana López ', ''), 'Prof. Ana López'));
+    test('sin nada', () => expect(profeYSalon(' ', ''), ''));
   });
 }

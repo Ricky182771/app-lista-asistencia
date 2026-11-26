@@ -39,8 +39,8 @@ String nombreMes(String mes) => '${_nombresMes[int.parse(mes.substring(5, 7)) - 
 String _mesCorto(String mes) =>
     '${_nombresMes[int.parse(mes.substring(5, 7)) - 1].substring(0, 3)} ${mes.substring(0, 4)}';
 
-/// "2026-11-03" → "mar 03".
-String _encabezadoDia(String fecha) => '${_diasSemana[DateTime.parse(fecha).weekday - 1]} ${fecha.substring(8)}';
+/// "2026-11-03" → "mar 03". También es la cabecera de las fechas en la vista mensual del teléfono.
+String encabezadoDia(String fecha) => '${_diasSemana[DateTime.parse(fecha).weekday - 1]} ${fecha.substring(8)}';
 
 String _capital(String s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
 
@@ -62,6 +62,7 @@ class Registro {
     required Map<String, Map<String, dynamic>> pases,
     required this.alumnos,
     required Set<String> meses,
+    this.subtitulo = '',
   }) : _estados = {
           for (final f in columnasDelMes(pases.keys.where(_formatoFecha.hasMatch)))
             if (meses.contains(_mes(f))) f: pases[f]!,
@@ -69,6 +70,12 @@ class Registro {
 
   /// "Grupo · Materia", como en la app.
   final String titulo;
+
+  /// "Prof. Nombre · Salón A7", como bajo el título de la vista mensual; `''` si no hay.
+  final String subtitulo;
+
+  /// Lo que va en la primera fila de cada hoja del .xlsx.
+  String get encabezado => subtitulo.isEmpty ? titulo : '$titulo · $subtitulo';
 
   /// `grupos.alumnos`: `[{num, nombre, activo}]`.
   final List<dynamic> alumnos;
@@ -222,13 +229,13 @@ HojaXlsx _hojaMes(Registro r, String mes) {
   return HojaXlsx(
     nombre: nombreHoja(nombreMes(mes)),
     filas: [
-      [CeldaXlsx.texto(r.titulo, EstiloXlsx.titulo)],
+      [CeldaXlsx.texto(r.encabezado, EstiloXlsx.titulo)],
       [CeldaXlsx.texto('${_capital(nombreMes(mes))} · ${_dias(fechas.length)} · $_leyenda', EstiloXlsx.nota)],
       [],
       [
         const CeldaXlsx.texto('N.L', EstiloXlsx.encabezado),
         const CeldaXlsx.texto('Nombre', EstiloXlsx.encabezado),
-        for (final f in fechas) CeldaXlsx.texto(_encabezadoDia(f), EstiloXlsx.encabezado),
+        for (final f in fechas) CeldaXlsx.texto(encabezadoDia(f), EstiloXlsx.encabezado),
         for (final t in ['Asistencias', 'Faltas', 'Justificadas', '% asistencia']) CeldaXlsx.texto(t, EstiloXlsx.total),
       ],
       ...datos,
@@ -278,7 +285,7 @@ HojaXlsx _hojaResumen(Registro r, List<String> meses) {
   return HojaXlsx(
     nombre: 'Resumen',
     filas: [
-      [CeldaXlsx.texto(r.titulo, EstiloXlsx.titulo)],
+      [CeldaXlsx.texto(r.encabezado, EstiloXlsx.titulo)],
       [
         CeldaXlsx.texto(
           'De ${nombreMes(meses.first)} a ${nombreMes(meses.last)} · ${_dias(fechas.length)}',

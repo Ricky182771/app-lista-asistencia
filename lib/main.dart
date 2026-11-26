@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'firebase_options.dart';
 import 'models/rol.dart';
 import 'screens/admin_home.dart';
+import 'screens/aviso_actualizacion.dart';
 import 'screens/login_screen.dart';
 import 'screens/orden_home.dart';
 import 'screens/profesor_home.dart';
@@ -81,10 +82,11 @@ class _ConSesionState extends State<_ConSesion> {
         if (snap.hasError) return _errorCarga(snap.error!);
         if (snap.connectionState == ConnectionState.waiting) return _cargando;
         final usuario = snap.data;
+        // La puerta solo se cierra si config/app.buildMinimo dice que este APK ya no sirve.
         return switch (decidirPantalla(conSesion: true, usuario: usuario)) {
-          Pantalla.profesor => ProfesorHome(usuario: usuario!),
-          Pantalla.orden => OrdenHome(usuario: usuario!),
-          Pantalla.admin => AdminHome(usuario: usuario!),
+          Pantalla.profesor => PuertaActualizacion(child: ProfesorHome(usuario: usuario!)),
+          Pantalla.orden => PuertaActualizacion(child: OrdenHome(usuario: usuario!)),
+          Pantalla.admin => PuertaActualizacion(child: AdminHome(usuario: usuario!)),
           Pantalla.sinAcceso || Pantalla.login => SinAccesoScreen(correo: widget.user.email ?? ''),
         };
       },

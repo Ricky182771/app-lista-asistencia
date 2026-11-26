@@ -38,6 +38,12 @@ void main() {
     expect(nombreMes('2026-12'), 'diciembre de 2026');
   });
 
+  test('encabezadoDia: día de la semana y día del mes', () {
+    expect(encabezadoDia('2026-11-03'), 'mar 03');
+    expect(encabezadoDia('2026-11-23'), 'lun 23');
+    expect(encabezadoDia('2026-11-29'), 'dom 29');
+  });
+
   test('nombreArchivo', () {
     expect(nombreArchivo('Prueba 3A · Matemáticas', ['2026-11'], 'xlsx'),
         'PaseLista - Prueba 3A - Matemáticas - 2026-11.xlsx');
@@ -124,6 +130,25 @@ void main() {
       // Ana: 2 de 3 en el periodo.
       expect(resumen, contains('<c r="C5" s="10"><v>2</v></c>'));
       expect(resumen, contains('<c r="F5" s="11"><v>0.6666666666666666</v></c>'));
+    });
+
+    test('con subtítulo, el profe y el salón van en el título de cada hoja', () {
+      final r = Registro(
+        titulo: 'Prueba 3A · Matemáticas',
+        subtitulo: 'Prof. Ana López · Salón A1',
+        pases: _pases,
+        alumnos: _alumnos,
+        meses: {'2026-10', '2026-11'},
+      );
+      final zip = leerZip(xlsxRegistro(r));
+      for (final hoja in ['sheet1', 'sheet2', 'sheet3']) {
+        expect(
+          zip['xl/worksheets/$hoja.xml'],
+          contains('<t xml:space="preserve">Prueba 3A · Matemáticas · Prof. Ana López · Salón A1</t>'),
+        );
+      }
+      // El nombre del archivo sigue siendo solo grupo y materia.
+      expect(nombreArchivo(r.titulo, r.meses, 'xlsx'), 'PaseLista - Prueba 3A - Matemáticas - 2026-10 a 2026-11.xlsx');
     });
 
     test('sin pases en los meses elegidos falla', () {

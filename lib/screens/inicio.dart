@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/rol.dart';
 import '../services/sesion.dart';
+import 'aviso_actualizacion.dart';
 
 /// Base común de los inicios por rol: foto, nombre, rol y cerrar sesión.
 class Inicio extends StatelessWidget {
@@ -17,6 +18,7 @@ class Inicio extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const AvisoActualizacionTarjeta(),
           ListTile(
             leading: Avatar(fotoUrl: usuario['fotoUrl'] as String?, nombre: nombre),
             title: Text(nombre),
